@@ -28,7 +28,7 @@ impl Parser {
                 program.push(fun);
                 program
             }
-            Token::TokEOF => Program { funcs: Vec::new() },
+            Token::TokEOF => Program::new(),
             token => panic!("parse error: {:?}", token),
         }
     }
