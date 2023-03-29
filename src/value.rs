@@ -17,9 +17,31 @@ impl Value {
 
     pub fn new_ptr(size: usize) -> Value {
         Value::ValPtr {
-            mem: Box::new(Vec::with_capacity(size)),
+            mem: Box::new(vec![0; size]),
             size,
             ptr: 0,
+        }
+    }
+
+    pub fn load(&self) -> Value {
+        match self {
+            Value::ValPtr { mem, size, ptr } => {
+                // TODO: bounds checking
+                Value::ValInt(mem[ptr.to_owned()])
+            }
+            Value::ValInt(_) => panic!("cannot load ValInt"),
+        }
+    }
+
+    pub fn store(&mut self, val: Value) {
+        match self {
+            Value::ValPtr { mem, size, ptr } => {
+                // TODO: bounds checking
+                if let Value::ValInt(int) = val {
+                    mem[ptr.to_owned()] = int
+                }
+            }
+            Value::ValInt(_) => panic!("cannot store ValInt!"),
         }
     }
 }
@@ -42,5 +64,33 @@ impl ops::Add<Value> for Value {
             },
             _ => panic!("ptr + ptr"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_int() {
+        let v1 = Value::new_int(114);
+        let v2 = Value::new_int(514);
+        assert_eq!(v1 + v2, Value::new_int(114 + 514))
+    }
+
+    #[test]
+    fn test_ptr() {
+        let mut p1 = Value::new_ptr(4);
+        let offset = Value::new_int(2);
+
+        p1.store(Value::ValInt(114));
+        assert_eq!(p1.load(), Value::ValInt(114));
+
+        let mut p2 = p1.clone() + offset;
+        assert_eq!(p2.load(), Value::ValInt(0));
+
+        p2.store(Value::ValInt(514));
+        assert_eq!(p2.load(), Value::ValInt(514));
+        assert_eq!(p1.load(), Value::ValInt(114))
     }
 }
