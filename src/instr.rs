@@ -63,7 +63,7 @@ pub struct Func {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    funcs: Vec<Func>,
+    pub funcs: Vec<Func>,
 }
 
 impl Program {

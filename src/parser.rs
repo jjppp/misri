@@ -12,31 +12,35 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn from(input: String) -> Parser {
+    pub fn from(input: &str) -> Parser {
         Parser {
-            lexer: Lexer::from(input),
+            lexer: Lexer::from(String::from(input)),
             body: LinkedList::new(),
         }
     }
 
     pub fn parse(&mut self) -> Program {
-        let tok = self.lexer.consume();
-        match tok {
+        let token = self.lexer.peek();
+        match token {
             Token::TokFunc => {
                 let fun = self.parse_func();
                 let mut program = self.parse();
                 program.push(fun);
                 program
             }
-            _ => panic!("parse error"),
+            Token::TokEOF => Program { funcs: Vec::new() },
+            token => panic!("parse error: {:?}", token),
         }
     }
 
     fn parse_func(&mut self) -> Func {
+        self.lexer.consume();
+        let name = self.parse_name();
+        self.lexer.consume();
         self.body = LinkedList::new();
         self.parse_body();
         let func = Func {
-            name: self.parse_name(),
+            name,
             body: self.body.clone(),
         };
         func
@@ -80,7 +84,7 @@ impl Parser {
                             _ => Instr::IrAssign(x, y),
                         }
                     }
-                    _ => panic!("parse error"),
+                    token => panic!("parse error: {:?}", token),
                 }
             }
             Token::TokStar => {
@@ -129,7 +133,7 @@ impl Parser {
                 self.lexer.consume();
                 Instr::IrWrite(self.parse_operand())
             }
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 
@@ -137,14 +141,14 @@ impl Parser {
         match self.lexer.consume() {
             Token::TokSharp => Operand::Imm(self.parse_int()),
             Token::TokIden(name) => Operand::Reg(name),
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 
     fn parse_int(&mut self) -> i32 {
         match self.lexer.consume() {
             Token::TokInt(int) => int,
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 
@@ -156,7 +160,7 @@ impl Parser {
             Token::TokGE => RelOp::OpGE,
             Token::TokEQ => RelOp::OpEQ,
             Token::TokNE => RelOp::OpNE,
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 
@@ -166,20 +170,20 @@ impl Parser {
             Token::TokSub => ArithOp::OpSub,
             Token::TokStar => ArithOp::OpMul,
             Token::TokDiv => ArithOp::OpDiv,
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 
     fn parse_name(&mut self) -> String {
         match self.lexer.consume() {
             Token::TokIden(name) => name,
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 
     fn parse_body(&mut self) {
         match self.lexer.peek() {
-            Token::TokFunc => (),
+            Token::TokFunc | Token::TokEOF => (),
             Token::TokIf
             | Token::TokLabel
             | Token::TokIden(_)
@@ -192,9 +196,10 @@ impl Parser {
             | Token::TokDec
             | Token::TokArg => {
                 let instr = self.parse_instr();
-                self.body.push_back(instr)
+                self.body.push_back(instr);
+                self.parse_body()
             }
-            _ => panic!("parse error"),
+            token => panic!("parse error: {:?}", token),
         }
     }
 }
@@ -205,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_instr() {
-        let mut parser = Parser::from(String::from(
+        let mut parser = Parser::from(
             "x := y
              x := y + z
              x := y - z
@@ -224,7 +229,7 @@ mod tests {
              PARAM x
              READ x
              WRITE x",
-        ));
+        );
         assert_eq!(
             parser.parse_instr(),
             Instr::IrAssign(Operand::from("x"), Operand::from("y"))
@@ -298,5 +303,84 @@ mod tests {
         assert_eq!(parser.parse_instr(), Instr::IrParam(Operand::from("x")));
         assert_eq!(parser.parse_instr(), Instr::IrRead(Operand::from("x")));
         assert_eq!(parser.parse_instr(), Instr::IrWrite(Operand::from("x")));
+    }
+
+    #[test]
+    fn test_func() {
+        let mut parser = Parser::from(
+            "FUNCTION fact :
+             PARAM v1
+             IF v1 == #1 GOTO label1
+             GOTO label2
+             LABEL label1 :
+             RETURN v1
+             LABEL label2 :
+             t1 := v1 - #1
+             ARG t1
+             t2 := CALL fact
+             t3 := v1 * t2
+             RETURN t3",
+        );
+        let func = parser.parse_func();
+        assert_eq!(func.name, String::from("fact"));
+        assert_eq!(func.body.len(), 11);
+        assert_eq!(
+            func.body,
+            LinkedList::from([
+                Instr::IrParam(Operand::from("v1")),
+                Instr::IrCond(
+                    Operand::from("v1"),
+                    RelOp::OpEQ,
+                    Operand::from(1),
+                    String::from("label1")
+                ),
+                Instr::IrGoto(String::from("label2")),
+                Instr::IrLabel(String::from("label1")),
+                Instr::IrReturn(Operand::from("v1")),
+                Instr::IrLabel(String::from("label2")),
+                Instr::IrArith(
+                    Operand::from("t1"),
+                    Operand::from("v1"),
+                    ArithOp::OpSub,
+                    Operand::from(1)
+                ),
+                Instr::IrArg(Operand::from("t1")),
+                Instr::IrCall(Operand::from("t2"), String::from("fact")),
+                Instr::IrArith(
+                    Operand::from("t3"),
+                    Operand::from("v1"),
+                    ArithOp::OpMul,
+                    Operand::from("t2")
+                ),
+                Instr::IrReturn(Operand::from("t3")),
+            ])
+        )
+    }
+
+    #[test]
+    fn test_program() {
+        let mut parser = Parser::from(
+            "FUNCTION add :
+             PARAM v1
+             t2 := *v1
+             t7 := v1 + #4
+             t3 := *t7
+             t1 := t2 + t3
+             RETURN t1
+
+             FUNCTION main :
+             DEC v3 8
+             t9 := &v3
+             *t9 := #1
+             t12 := t10 + #4
+             *t12 := #2
+             ARG t10
+             t14 := CALL add
+             v2 := t14
+             WRITE v2
+             RETURN #0",
+        );
+        let program = parser.parse();
+        assert_eq!(program.funcs.len(), 2);
     }
 }
