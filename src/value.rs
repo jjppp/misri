@@ -11,11 +11,11 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn newInt(int: i32) -> Value {
+    pub fn new_int(int: i32) -> Value {
         Value::ValInt(int)
     }
 
-    pub fn newPtr(size: usize) -> Value {
+    pub fn new_ptr(size: usize) -> Value {
         Value::ValPtr {
             mem: Box::new(Vec::with_capacity(size)),
             size,
