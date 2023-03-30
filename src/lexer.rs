@@ -120,6 +120,16 @@ impl Lexer {
                 self.char_stream.consume();
                 Token::TokAmp
             }
+            Some('!') => {
+                self.char_stream.consume();
+                match self.char_stream.peek() {
+                    Some('=') => {
+                        self.char_stream.consume();
+                        Token::TokNE
+                    }
+                    ch => panic!("lex error: {:?}", ch),
+                }
+            }
             ch => panic!("lex error: {:?}", ch),
         };
         result

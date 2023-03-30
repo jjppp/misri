@@ -148,10 +148,10 @@ impl Default for Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ValInt(int) => writeln!(f, "{int}"),
+            Self::ValInt(int) => write!(f, "{int}"),
             Self::ValPtr { .. } => {
                 let value = self.load();
-                writeln!(f, "{value}")
+                write!(f, "{value}")
             }
         }
     }

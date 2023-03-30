@@ -9,6 +9,8 @@ use clap::{arg, Command};
 use parser::Parser;
 use std::fs;
 
+use crate::exec::exec;
+
 fn main() {
     let matches = Command::new("misri")
         .version("0.1.0")
@@ -24,6 +26,7 @@ fn main() {
 
     let cont = fs::read_to_string(file).expect("file error");
     let mut parser = Parser::from(cont.as_str());
-    let program = parser.parse();
-    println!("{program}");
+    let mut program = parser.parse();
+    program.init();
+    exec(&program);
 }

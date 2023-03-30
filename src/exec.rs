@@ -6,7 +6,7 @@ use crate::{
     value::Value,
 };
 
-pub fn exec(program: Program) {
+pub fn exec(program: &Program) {
     let mut env = Env::new(&program);
     loop {
         let instr = program.fetch(env.top_frame());
@@ -121,6 +121,61 @@ mod tests {
         );
         let mut program = parser.parse();
         program.init();
-        exec(program);
+        exec(&program);
+    }
+
+    #[test]
+    fn test_arg() {
+        let mut parser = Parser::from(
+            "FUNCTION id :
+             PARAM n
+             RETURN n
+
+             FUNCTION main :
+             ARG #114
+             x := CALL id
+             ARG #514
+             y := CALL id
+             WRITE x
+             WRITE y
+             RETURN #0
+             ",
+        );
+        let mut program = parser.parse();
+        program.init();
+        exec(&program);
+    }
+
+    #[test]
+    fn test_fib() {
+        let mut parser = Parser::from(
+            " FUNCTION fib :
+             PARAM n
+             IF n != #0 GOTO br1
+             RETURN #0
+             LABEL br1 :
+             IF n != #1 GOTO br2
+             RETURN #1
+             LABEL br2 :
+             t1 := n - #1
+             ARG t1
+             r1 := CALL fib
+             t2 := n - #2
+             ARG t2
+             r2 := CALL fib
+             u := r1 + r2
+             RETURN u
+ 
+             FUNCTION main :
+             READ n
+             ARG n
+             s := CALL fib
+             WRITE s
+             RETURN #0
+            ",
+        );
+        let mut program = parser.parse();
+        program.init();
+        exec(&program);
     }
 }

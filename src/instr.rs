@@ -146,13 +146,15 @@ pub struct Func {
 impl Func {
     pub fn init(&mut self) {
         let mut map = HashMap::new();
-        let mut id: usize = 0;
+
+        self.body.iter().enumerate().for_each(|(id, instr)| {
+            if let Instr::IrLabel(name) = instr {
+                map.insert(name.clone(), id);
+            }
+        });
+
         for instr in &mut self.body {
             match instr {
-                Instr::IrLabel(name) => {
-                    map.insert(name.clone(), id);
-                    id += 1;
-                }
                 Instr::IrGoto { name, .. } => {
                     let id = map.get(name).unwrap().clone();
                     *instr = Instr::IrGoto {
@@ -160,15 +162,8 @@ impl Func {
                         id,
                     }
                 }
-                Instr::IrCond { x, op, y, name, .. } => {
-                    let id = map.get(name).unwrap().clone();
-                    *instr = Instr::IrCond {
-                        x: x.clone(),
-                        op: op.clone(),
-                        y: y.clone(),
-                        name: name.clone(),
-                        id,
-                    }
+                Instr::IrCond { id, name, .. } => {
+                    *id = map.get(name).expect(format!("{name}").as_str()).clone();
                 }
                 _ => (),
             }
@@ -287,7 +282,7 @@ mod tests {
                 op: RelOp::OpLE,
                 y: Operand::from(100),
                 name: String::from("loop"),
-                id: 0
+                id: 3
             }
         );
         assert_eq!(
