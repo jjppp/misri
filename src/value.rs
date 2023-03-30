@@ -1,10 +1,10 @@
-use std::{fmt::Display, ops};
+use std::{cell::RefCell, fmt::Display, ops, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     ValInt(i32),
     ValPtr {
-        mem: Box<Vec<i32>>,
+        mem: Rc<RefCell<Vec<i32>>>,
         size: usize,
         ptr: usize,
     },
@@ -17,7 +17,7 @@ impl Value {
 
     pub fn new_ptr(size: usize) -> Value {
         Value::ValPtr {
-            mem: Box::new(vec![0; size]),
+            mem: Rc::new(RefCell::new(vec![0; size])),
             size,
             ptr: 0,
         }
@@ -27,18 +27,18 @@ impl Value {
         match self {
             Value::ValPtr { mem, size, ptr } => {
                 // TODO: bounds checking
-                Value::ValInt(mem[ptr.to_owned()])
+                Value::ValInt(mem.borrow()[*ptr])
             }
             Value::ValInt(_) => panic!("cannot load ValInt"),
         }
     }
 
-    pub fn store(&mut self, val: Value) {
+    pub fn store(&self, val: Value) {
         match self {
             Value::ValPtr { mem, size, ptr } => {
                 // TODO: bounds checking
                 if let Value::ValInt(int) = val {
-                    mem[ptr.to_owned()] = int
+                    mem.borrow_mut()[*ptr] = int
                 }
             }
             Value::ValInt(_) => panic!("cannot store ValInt!"),
@@ -53,14 +53,9 @@ impl ops::Add<Value> for Value {
         match (self, rhs) {
             (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs + rhs),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
-                mem,
+                mem: mem.clone(),
                 size,
                 ptr: (ptr as i32 + rhs) as usize,
-            },
-            (Value::ValInt(lhs), Value::ValPtr { mem, size, ptr }) => Value::ValPtr {
-                mem,
-                size,
-                ptr: (ptr as i32 + lhs) as usize,
             },
             _ => panic!("ptr + ptr"),
         }
@@ -95,14 +90,9 @@ impl ops::Mul<Value> for Value {
         match (self, rhs) {
             (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs * rhs),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
-                mem,
+                mem: mem.clone(),
                 size,
                 ptr: (ptr as i32 * rhs) as usize,
-            },
-            (Value::ValInt(lhs), Value::ValPtr { mem, size, ptr }) => Value::ValPtr {
-                mem,
-                size,
-                ptr: (ptr as i32 * lhs) as usize,
             },
             _ => panic!("ptr * ptr"),
         }
@@ -116,14 +106,9 @@ impl ops::Div<Value> for Value {
         match (self, rhs) {
             (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs / rhs),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
-                mem,
+                mem: mem.clone(),
                 size,
                 ptr: (ptr as i32 / rhs) as usize,
-            },
-            (Value::ValInt(lhs), Value::ValPtr { mem, size, ptr }) => Value::ValPtr {
-                mem,
-                size,
-                ptr: (ptr as i32 / lhs) as usize,
             },
             _ => panic!("ptr / ptr"),
         }
@@ -170,17 +155,29 @@ mod tests {
 
     #[test]
     fn test_ptr() {
-        let mut p1 = Value::new_ptr(4);
+        let p1 = Value::new_ptr(4);
         let offset = Value::new_int(2);
 
         p1.store(Value::ValInt(114));
         assert_eq!(p1.load(), Value::ValInt(114));
 
-        let mut p2 = p1.clone() + offset;
+        let p2 = p1.clone() + offset;
         assert_eq!(p2.load(), Value::ValInt(0));
 
         p2.store(Value::ValInt(514));
         assert_eq!(p2.load(), Value::ValInt(514));
-        assert_eq!(p1.load(), Value::ValInt(114))
+        assert_eq!(p1.load(), Value::ValInt(114));
+
+        let mut p1 = Value::new_ptr(24);
+        p1.store(Value::new_int(114));
+        let mut p2 = p1.clone();
+        assert_eq!(p2.load(), Value::new_int(114));
+        p2.store(Value::new_int(514));
+        assert_eq!(p1.load(), Value::new_int(514));
+        p1 = p1 + Value::new_int(4);
+        assert_eq!(p2.load(), Value::new_int(514));
+        p1.store(Value::new_int(222));
+        p2 = p2 + Value::new_int(4);
+        assert_eq!(p2.load(), Value::new_int(222));
     }
 }

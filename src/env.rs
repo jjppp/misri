@@ -21,8 +21,8 @@ impl Frame {
         }
     }
 
-    pub fn get(&self, operand: &Operand) -> Option<Value> {
-        self.map.get(operand).map(|x| x.clone())
+    pub fn get(&self, operand: &Operand) -> Option<&Value> {
+        self.map.get(operand)
     }
 
     pub fn set(&mut self, operand: &Operand, value: &Value) {
@@ -64,10 +64,14 @@ impl Env {
         self.top_frame().pc
     }
 
-    pub fn get(&self, operand: Operand) -> Value {
+    pub fn get(&self, operand: &Operand) -> Value {
         match operand {
-            Operand::Imm(int) => Value::new_int(int),
-            Operand::Reg(_) => self.top_frame().get(&operand).unwrap_or(Default::default()),
+            Operand::Imm(int) => Value::new_int(int.clone()),
+            Operand::Reg(name) => self
+                .top_frame()
+                .get(operand)
+                .expect(format!("{name} undefined").as_str())
+                .clone(),
         }
     }
 
@@ -108,16 +112,15 @@ mod tests {
         env.set(Operand::from("x"), Value::new_int(114));
         env.set(Operand::from("x"), Value::new_int(514));
         env.set(Operand::from("p"), Value::new_ptr(514));
-        assert_eq!(env.get(Operand::from("x")), Value::new_int(514));
-        assert_eq!(env.get(Operand::from("p")), Value::new_ptr(514));
+        assert_eq!(env.get(&Operand::from("x")), Value::new_int(514));
+        assert_eq!(env.get(&Operand::from("p")), Value::new_ptr(514));
 
         env.push_frame(Default::default());
-        assert_eq!(env.get(Operand::from("x")), Default::default());
         env.set(Operand::from("x"), Value::new_int(1919));
-        assert_eq!(env.get(Operand::from("x")), Value::new_int(1919));
+        assert_eq!(env.get(&Operand::from("x")), Value::new_int(1919));
 
         env.pop_frame();
-        assert_eq!(env.get(Operand::from("x")), Value::new_int(514));
-        assert_eq!(env.get(Operand::from("p")), Value::new_ptr(514));
+        assert_eq!(env.get(&Operand::from("x")), Value::new_int(514));
+        assert_eq!(env.get(&Operand::from("p")), Value::new_ptr(514));
     }
 }

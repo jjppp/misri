@@ -13,8 +13,8 @@ pub fn exec(program: &Program) {
         match instr {
             IrArith(x, y, op, z) => {
                 env.pc_advance();
-                let vy = env.get(y);
-                let vz = env.get(z);
+                let vy = env.get(&y);
+                let vz = env.get(&z);
                 let value = match op {
                     ArithOp::OpAdd => vy + vz,
                     ArithOp::OpSub => vy - vz,
@@ -25,23 +25,25 @@ pub fn exec(program: &Program) {
             }
             IrAssign(x, y) => {
                 env.pc_advance();
-                env.set(x, env.get(y))
+                env.set(x, env.get(&y))
             }
             IrDeref(x, y) => {
                 env.pc_advance();
-                env.set(x, env.get(y))
+                env.set(x, env.get(&y))
             }
             IrStore(x, y) => {
                 env.pc_advance();
-                env.get(x).store(env.get(y))
+                let val = env.get(&y);
+                let addr = env.get(&x);
+                addr.store(val);
             }
             IrLoad(x, y) => {
                 env.pc_advance();
-                env.set(x, env.get(y).load())
+                env.set(x, env.get(&y).load())
             }
             IrArg(x) => {
                 env.pc_advance();
-                env.push_arg(env.get(x))
+                env.push_arg(env.get(&x))
             }
             IrParam(x) => {
                 env.pc_advance();
@@ -58,7 +60,7 @@ pub fn exec(program: &Program) {
             }
             IrWrite(x) => {
                 env.pc_advance();
-                let value = env.get(x);
+                let value = env.get(&x);
                 println!("{value}")
             }
             IrDec(x, size) => {
@@ -72,7 +74,7 @@ pub fn exec(program: &Program) {
                 if env.top_frame().func == program.entry {
                     return;
                 }
-                let value = env.get(x);
+                let value = env.get(&x);
                 env.pop_frame();
                 let func = &program.funcs[env.top_frame().func];
                 match &func.body[env.pc()] {
@@ -83,8 +85,8 @@ pub fn exec(program: &Program) {
             }
             IrGoto { id, .. } => env.pc_set(id),
             IrCond { x, op, y, id, .. } => {
-                let vx = env.get(x);
-                let vy = env.get(y);
+                let vx = env.get(&x);
+                let vy = env.get(&y);
                 let jmp = match op {
                     RelOp::OpLT => vx < vy,
                     RelOp::OpLE => vx <= vy,
@@ -171,6 +173,34 @@ mod tests {
              ARG n
              s := CALL fib
              WRITE s
+             RETURN #0
+            ",
+        );
+        let mut program = parser.parse();
+        program.init();
+        exec(&program);
+    }
+
+    #[test]
+    fn test_arr() {
+        let mut parser = Parser::from(
+            "FUNCTION display :
+             PARAM arr1
+             c := *arr1
+             WRITE c
+             d := arr1 + #4
+             c := *d
+             WRITE c
+             RETURN #0
+
+             FUNCTION main :
+             DEC tmp_1 24
+             arr2 := &tmp_1
+             *arr2 := #114
+             tmp := arr2 + #4
+             *tmp := #514
+             ARG arr2
+             uu  := CALL display
              RETURN #0
             ",
         );
