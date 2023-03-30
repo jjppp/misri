@@ -1,7 +1,6 @@
-use std::{
-    collections::LinkedList,
-    fmt::{Display, Formatter},
-};
+use std::fmt::{Display, Formatter};
+
+use crate::env::Frame;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operand {
@@ -80,12 +79,12 @@ pub enum Instr {
     IrStore(Operand, Operand),
     IrLoad(Operand, Operand),
     IrLabel(String),
-    IrGoto(String),
-    IrCond(Operand, RelOp, Operand, String),
+    IrGoto(String, usize),
+    IrCond(Operand, RelOp, Operand, String, usize),
     IrReturn(Operand),
     IrDec(Operand, i32),
     IrArg(Operand),
-    IrCall(Operand, String),
+    IrCall(Operand, String, usize),
     IrParam(Operand),
     IrRead(Operand),
     IrWrite(Operand),
@@ -100,12 +99,12 @@ impl Display for Instr {
             Self::IrStore(x, y) => write!(f, "*{x} := {y}"),
             Self::IrLoad(x, y) => write!(f, "{x} := *{y}"),
             Self::IrLabel(name) => write!(f, "LABEL {name} :"),
-            Self::IrGoto(name) => write!(f, "GOTO {name} "),
-            Self::IrCond(x, op, y, name) => write!(f, "IF {x} {op} {y} GOTO {name}"),
+            Self::IrGoto(name, _) => write!(f, "GOTO {name} "),
+            Self::IrCond(x, op, y, name, _) => write!(f, "IF {x} {op} {y} GOTO {name}"),
             Self::IrReturn(x) => write!(f, "RETURN {x}"),
             Self::IrDec(x, size) => write!(f, "DEC {x} {size}"),
             Self::IrArg(x) => write!(f, "ARG {x}"),
-            Self::IrCall(x, name) => write!(f, "{x} := CALL {name}"),
+            Self::IrCall(x, name, _) => write!(f, "{x} := CALL {name}"),
             Self::IrParam(x) => write!(f, "PARAM {x}"),
             Self::IrRead(x) => write!(f, "READ {x}"),
             Self::IrWrite(x) => write!(f, "WRITE {x}"),
@@ -116,7 +115,11 @@ impl Display for Instr {
 #[derive(Debug, Clone)]
 pub struct Func {
     pub name: String,
-    pub body: LinkedList<Instr>,
+    pub body: Vec<Instr>,
+}
+
+impl Func {
+    pub fn init(&mut self) {}
 }
 
 impl Display for Func {
@@ -150,6 +153,12 @@ impl Program {
             entry: 0,
         }
     }
+
+    pub fn fetch(&self, frame: &Frame) -> Instr {
+        self.funcs[frame.func].body[frame.pc].clone()
+    }
+
+    pub fn init(&mut self) {}
 }
 
 impl Display for Program {

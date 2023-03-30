@@ -1,4 +1,5 @@
 mod env;
+mod exec;
 mod instr;
 mod lexer;
 mod parser;
