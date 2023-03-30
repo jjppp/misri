@@ -157,8 +157,13 @@ impl Parser {
     }
 
     fn parse_int(&mut self) -> i32 {
+        let mut sign = 1;
+        if self.lexer.peek() == Token::TokSub {
+            self.lexer.consume();
+            sign = -1
+        }
         match self.lexer.consume() {
-            Token::TokInt(int) => int,
+            Token::TokInt(int) => int * sign,
             token => panic!("parse error: {:?}", token),
         }
     }
