@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{instr::Operand, value::Value};
+use crate::{
+    instr::{Operand, Program},
+    value::Value,
+};
 
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -34,9 +37,9 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn new() -> Env {
+    pub fn new(program: &Program) -> Env {
         Env {
-            stack: vec![Frame::new(Default::default())],
+            stack: vec![Frame::new(program.entry)],
             args: Vec::new(),
         }
     }
@@ -62,7 +65,10 @@ impl Env {
     }
 
     pub fn get(&self, operand: Operand) -> Value {
-        self.top_frame().get(&operand).unwrap_or(Default::default())
+        match operand {
+            Operand::Imm(int) => Value::new_int(int),
+            Operand::Reg(_) => self.top_frame().get(&operand).unwrap_or(Default::default()),
+        }
     }
 
     pub fn set(&mut self, operand: Operand, value: Value) {
@@ -88,11 +94,16 @@ impl Env {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
     use super::*;
 
     #[test]
     fn test_get_set() {
-        let mut env = Env::new();
+        let mut env = Env::new(&Program {
+            funcs: VecDeque::new(),
+            entry: 0,
+        });
 
         env.set(Operand::from("x"), Value::new_int(114));
         env.set(Operand::from("x"), Value::new_int(514));

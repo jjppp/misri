@@ -150,8 +150,8 @@ impl Func {
         for instr in &mut self.body {
             match instr {
                 Instr::IrLabel(name) => {
-                    id += 1;
                     map.insert(name.clone(), id);
+                    id += 1;
                 }
                 Instr::IrGoto { name, .. } => {
                     let id = map.get(name).unwrap().clone();
@@ -193,7 +193,7 @@ impl Display for Func {
 #[derive(Debug, Clone)]
 pub struct Program {
     pub funcs: VecDeque<Func>,
-    entry: usize,
+    pub entry: usize,
 }
 
 impl Program {
@@ -219,12 +219,17 @@ impl Program {
     pub fn init(&mut self) {
         self.funcs.iter_mut().for_each(|func| func.init());
 
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, usize> = HashMap::new();
         let mut id: usize = 0;
         for func in &self.funcs {
-            id += 1;
             map.insert(func.name.clone(), id);
+            id += 1;
         }
+
+        self.entry = map
+            .get(&String::from("main"))
+            .expect("no main function found")
+            .clone();
 
         self.funcs
             .iter_mut()
@@ -282,7 +287,7 @@ mod tests {
                 op: RelOp::OpLE,
                 y: Operand::from(100),
                 name: String::from("loop"),
-                id: 1
+                id: 0
             }
         );
         assert_eq!(
@@ -290,8 +295,9 @@ mod tests {
             Instr::IrCall {
                 x: Operand::from("s"),
                 name: String::from("foo"),
-                id: 1
+                id: 0
             }
-        )
+        );
+        assert_eq!(program.entry, 1);
     }
 }

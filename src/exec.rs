@@ -7,11 +7,12 @@ use crate::{
 };
 
 pub fn exec(program: Program) {
-    let mut env = Env::new();
+    let mut env = Env::new(&program);
     loop {
         let instr = program.fetch(env.top_frame());
         match instr {
             IrArith(x, y, op, z) => {
+                env.pc_advance();
                 let vy = env.get(y);
                 let vz = env.get(z);
                 let value = match op {
@@ -68,6 +69,9 @@ pub fn exec(program: Program) {
                 env.push_frame(id);
             }
             IrReturn(x) => {
+                if env.top_frame().func == program.entry {
+                    return;
+                }
                 let value = env.get(x);
                 env.pop_frame();
                 let func = &program.funcs[env.top_frame().func];
@@ -96,5 +100,27 @@ pub fn exec(program: Program) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::Parser;
+
+    use super::*;
+
+    #[test]
+    fn test_exec() {
+        let mut parser = Parser::from(
+            "FUNCTION main :
+             x := #114 * #514
+             y := #0 - x
+             WRITE y
+             RETURN #0
+             ",
+        );
+        let mut program = parser.parse();
+        program.init();
+        exec(program);
     }
 }
