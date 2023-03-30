@@ -64,7 +64,7 @@ pub fn exec(program: Program) {
                 env.pc_advance();
                 env.set(x, Value::new_ptr(size as usize))
             }
-            IrCall(_, _, id) => {
+            IrCall { id, .. } => {
                 env.push_frame(id);
             }
             IrReturn(x) => {
@@ -72,13 +72,13 @@ pub fn exec(program: Program) {
                 env.pop_frame();
                 let func = &program.funcs[env.top_frame().func];
                 match &func.body[env.pc()] {
-                    IrCall(x, _, _) => env.set(x.clone(), value),
+                    IrCall { x, .. } => env.set(x.clone(), value),
                     _ => panic!("return error"),
                 }
                 env.pc_advance()
             }
-            IrGoto(_, label) => env.pc_set(label),
-            IrCond(x, op, y, _, label) => {
+            IrGoto { id, .. } => env.pc_set(id),
+            IrCond { x, op, y, id, .. } => {
                 let vx = env.get(x);
                 let vy = env.get(y);
                 let jmp = match op {
@@ -90,7 +90,7 @@ pub fn exec(program: Program) {
                     RelOp::OpNE => vx != vy,
                 };
                 if jmp {
-                    env.pc_set(label);
+                    env.pc_set(id);
                 } else {
                     env.pc_advance();
                 }

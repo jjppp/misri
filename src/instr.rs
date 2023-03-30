@@ -1,4 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::{Display, Formatter},
+};
 
 use crate::env::Frame;
 
@@ -79,15 +82,37 @@ pub enum Instr {
     IrStore(Operand, Operand),
     IrLoad(Operand, Operand),
     IrLabel(String),
-    IrGoto(String, usize),
-    IrCond(Operand, RelOp, Operand, String, usize),
+    IrGoto {
+        name: String,
+        id: usize,
+    },
+    IrCond {
+        x: Operand,
+        op: RelOp,
+        y: Operand,
+        name: String,
+        id: usize,
+    },
     IrReturn(Operand),
     IrDec(Operand, i32),
     IrArg(Operand),
-    IrCall(Operand, String, usize),
+    IrCall {
+        x: Operand,
+        name: String,
+        id: usize,
+    },
     IrParam(Operand),
     IrRead(Operand),
     IrWrite(Operand),
+}
+
+impl Instr {
+    pub fn new_goto(name: &str) -> Instr {
+        Self::IrGoto {
+            name: String::from(name),
+            id: Default::default(),
+        }
+    }
 }
 
 impl Display for Instr {
@@ -99,12 +124,12 @@ impl Display for Instr {
             Self::IrStore(x, y) => write!(f, "*{x} := {y}"),
             Self::IrLoad(x, y) => write!(f, "{x} := *{y}"),
             Self::IrLabel(name) => write!(f, "LABEL {name} :"),
-            Self::IrGoto(name, _) => write!(f, "GOTO {name} "),
-            Self::IrCond(x, op, y, name, _) => write!(f, "IF {x} {op} {y} GOTO {name}"),
+            Self::IrGoto { name, .. } => write!(f, "GOTO {name} "),
+            Self::IrCond { x, op, y, name, .. } => write!(f, "IF {x} {op} {y} GOTO {name}"),
             Self::IrReturn(x) => write!(f, "RETURN {x}"),
             Self::IrDec(x, size) => write!(f, "DEC {x} {size}"),
             Self::IrArg(x) => write!(f, "ARG {x}"),
-            Self::IrCall(x, name, _) => write!(f, "{x} := CALL {name}"),
+            Self::IrCall { x, name, .. } => write!(f, "{x} := CALL {name}"),
             Self::IrParam(x) => write!(f, "PARAM {x}"),
             Self::IrRead(x) => write!(f, "READ {x}"),
             Self::IrWrite(x) => write!(f, "WRITE {x}"),
@@ -119,7 +144,36 @@ pub struct Func {
 }
 
 impl Func {
-    pub fn init(&mut self) {}
+    pub fn init(&mut self) {
+        let mut map = HashMap::new();
+        let mut id: usize = 0;
+        for instr in &mut self.body {
+            match instr {
+                Instr::IrLabel(name) => {
+                    id += 1;
+                    map.insert(name.clone(), id);
+                }
+                Instr::IrGoto { name, .. } => {
+                    let id = map.get(name).unwrap().clone();
+                    *instr = Instr::IrGoto {
+                        name: name.clone(),
+                        id,
+                    }
+                }
+                Instr::IrCond { x, op, y, name, .. } => {
+                    let id = map.get(name).unwrap().clone();
+                    *instr = Instr::IrCond {
+                        x: x.clone(),
+                        op: op.clone(),
+                        y: y.clone(),
+                        name: name.clone(),
+                        id,
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
 }
 
 impl Display for Func {
@@ -138,18 +192,22 @@ impl Display for Func {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub funcs: Vec<Func>,
+    pub funcs: VecDeque<Func>,
     entry: usize,
 }
 
 impl Program {
-    pub fn push(&mut self, func: Func) {
-        self.funcs.push(func)
+    pub fn push_back(&mut self, func: Func) {
+        self.funcs.push_back(func)
+    }
+
+    pub fn push_front(&mut self, func: Func) {
+        self.funcs.push_front(func)
     }
 
     pub fn new() -> Program {
         Program {
-            funcs: Vec::new(),
+            funcs: VecDeque::new(),
             entry: 0,
         }
     }
@@ -158,7 +216,25 @@ impl Program {
         self.funcs[frame.func].body[frame.pc].clone()
     }
 
-    pub fn init(&mut self) {}
+    pub fn init(&mut self) {
+        self.funcs.iter_mut().for_each(|func| func.init());
+
+        let mut map = HashMap::new();
+        let mut id: usize = 0;
+        for func in &self.funcs {
+            id += 1;
+            map.insert(func.name.clone(), id);
+        }
+
+        self.funcs
+            .iter_mut()
+            .flat_map(|func| func.body.iter_mut())
+            .for_each(|instr| {
+                if let Instr::IrCall { name, id, .. } = instr {
+                    *id = map.get(name).unwrap().clone()
+                }
+            });
+    }
 }
 
 impl Display for Program {
@@ -167,5 +243,55 @@ impl Display for Program {
             writeln!(f, "{func}\n")?
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::Parser;
+
+    use super::*;
+
+    #[test]
+    fn test_init() {
+        let mut parser = Parser::from(
+            "FUNCTION foo :
+         PARAM n
+         i := #1
+         s := #0
+         LABEL loop :
+         i := i + #1
+         s := s + i
+         IF i <= #100 GOTO loop
+         RETURN s
+         
+         FUNCTION main :
+         READ n
+         ARG n
+         s := CALL foo
+         WRITE s
+         RETURN #0",
+        );
+
+        let mut program = parser.parse();
+        program.init();
+        assert_eq!(
+            program.funcs[0].body[6],
+            Instr::IrCond {
+                x: Operand::from("i"),
+                op: RelOp::OpLE,
+                y: Operand::from(100),
+                name: String::from("loop"),
+                id: 1
+            }
+        );
+        assert_eq!(
+            program.funcs[1].body[2],
+            Instr::IrCall {
+                x: Operand::from("s"),
+                name: String::from("foo"),
+                id: 1
+            }
+        )
     }
 }

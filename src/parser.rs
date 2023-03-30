@@ -23,7 +23,7 @@ impl Parser {
             Token::TokFunc => {
                 let fun = self.parse_func();
                 let mut program = self.parse();
-                program.push(fun);
+                program.push_front(fun);
                 program
             }
             Token::TokEOF => Program::new(),
@@ -68,8 +68,12 @@ impl Parser {
                     }
                     Token::TokCall => {
                         self.lexer.consume();
-                        let f_name = self.parse_name();
-                        Instr::IrCall(x, f_name, Default::default())
+                        let name = self.parse_name();
+                        Instr::IrCall {
+                            x,
+                            name,
+                            id: Default::default(),
+                        }
                     }
                     Token::TokIden(_) | Token::TokSharp => {
                         let y = self.parse_operand();
@@ -94,16 +98,25 @@ impl Parser {
             }
             Token::TokGoto => {
                 self.lexer.consume();
-                Instr::IrGoto(self.parse_name(), Default::default())
+                Instr::IrGoto {
+                    name: self.parse_name(),
+                    id: Default::default(),
+                }
             }
             Token::TokIf => {
                 self.lexer.consume();
-                let lhs = self.parse_operand();
+                let x = self.parse_operand();
                 let op = self.parse_rel_op();
-                let rhs = self.parse_operand();
+                let y = self.parse_operand();
                 self.lexer.consume();
                 let name = self.parse_name();
-                Instr::IrCond(lhs, op, rhs, name, Default::default())
+                Instr::IrCond {
+                    x,
+                    op,
+                    y,
+                    name,
+                    id: Default::default(),
+                }
             }
             Token::TokReturn => {
                 self.lexer.consume();
@@ -280,27 +293,28 @@ mod tests {
             parser.parse_instr(),
             Instr::IrStore(Operand::from("x"), Operand::from("y"))
         );
-        assert_eq!(
-            parser.parse_instr(),
-            Instr::IrGoto(String::from("wjp"), Default::default())
-        );
+        assert_eq!(parser.parse_instr(), Instr::new_goto("wjp"));
         assert_eq!(parser.parse_instr(), Instr::IrLabel(String::from("wjp")));
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrCond(
-                Operand::from("x"),
-                RelOp::OpLT,
-                Operand::from("y"),
-                String::from("wjp"),
-                Default::default()
-            )
+            Instr::IrCond {
+                x: Operand::from("x"),
+                op: RelOp::OpLT,
+                y: Operand::from("y"),
+                name: String::from("wjp"),
+                id: Default::default()
+            }
         );
         assert_eq!(parser.parse_instr(), Instr::IrReturn(Operand::from("x")));
         assert_eq!(parser.parse_instr(), Instr::IrDec(Operand::from("arr"), 24));
         assert_eq!(parser.parse_instr(), Instr::IrArg(Operand::from("x")));
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrCall(Operand::from("y"), String::from("foo"), Default::default())
+            Instr::IrCall {
+                x: Operand::from("y"),
+                name: String::from("foo"),
+                id: Default::default()
+            }
         );
         assert_eq!(parser.parse_instr(), Instr::IrParam(Operand::from("x")));
         assert_eq!(parser.parse_instr(), Instr::IrRead(Operand::from("x")));
@@ -330,14 +344,14 @@ mod tests {
             func.body,
             Vec::from([
                 Instr::IrParam(Operand::from("v1")),
-                Instr::IrCond(
-                    Operand::from("v1"),
-                    RelOp::OpEQ,
-                    Operand::from(1),
-                    String::from("label1"),
-                    Default::default()
-                ),
-                Instr::IrGoto(String::from("label2"), Default::default()),
+                Instr::IrCond {
+                    x: Operand::from("v1"),
+                    op: RelOp::OpEQ,
+                    y: Operand::from(1),
+                    name: String::from("label1"),
+                    id: Default::default()
+                },
+                Instr::new_goto("label2"),
                 Instr::IrLabel(String::from("label1")),
                 Instr::IrReturn(Operand::from("v1")),
                 Instr::IrLabel(String::from("label2")),
@@ -348,11 +362,11 @@ mod tests {
                     Operand::from(1)
                 ),
                 Instr::IrArg(Operand::from("t1")),
-                Instr::IrCall(
-                    Operand::from("t2"),
-                    String::from("fact"),
-                    Default::default()
-                ),
+                Instr::IrCall {
+                    x: Operand::from("t2"),
+                    name: String::from("fact"),
+                    id: Default::default()
+                },
                 Instr::IrArith(
                     Operand::from("t3"),
                     Operand::from("v1"),
