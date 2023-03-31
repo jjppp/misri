@@ -1,4 +1,7 @@
-use std::io;
+use std::{
+    fmt::Debug,
+    io::{BufRead, BufReader, BufWriter, Write},
+};
 
 use crate::{
     env::Env,
@@ -6,15 +9,51 @@ use crate::{
     value::Value,
 };
 
-pub fn exec(program: &Program) -> usize {
-    let mut instr_cnt = 0;
-    let mut env = Env::new(program);
-    loop {
+pub struct Interpreter<T, U>
+where
+    U: std::io::Write,
+{
+    program: Program,
+    env: Env,
+    fin: BufReader<T>,
+    fout: BufWriter<U>,
+}
+
+impl<T, U> Interpreter<T, U>
+where
+    T: std::io::Read,
+    U: std::io::Write + Debug,
+{
+    pub fn new(mut program: Program, fin: T, fout: U) -> Self
+    where
+        T: std::io::Read,
+        U: std::io::Write,
+    {
+        program.init();
+        let env = Env::new(&program);
+        Interpreter {
+            program,
+            env,
+            fin: BufReader::new(fin),
+            fout: BufWriter::new(fout),
+        }
+    }
+
+    pub fn exec(&mut self) -> usize {
+        let mut instr_cnt = 0;
+        while let Some(next_pc) = self.step() {
+            self.env.pc_set(next_pc);
+            instr_cnt += 1
+        }
+        instr_cnt
+    }
+
+    pub fn step(&mut self) -> Option<usize> {
+        let program = &self.program;
+        let env = &mut self.env;
         let instr = program.fetch(env.top_frame());
-        instr_cnt += 1;
         match instr {
             Arith(x, y, op, z) => {
-                env.pc_advance();
                 let vy = env.get(&y);
                 let vz = env.get(&z);
                 let value = match op {
@@ -23,58 +62,60 @@ pub fn exec(program: &Program) -> usize {
                     ArithOp::Mul => vy * vz,
                     ArithOp::Div => vy / vz,
                 };
-                env.set(x, value)
+                env.set(x, value);
+                Some(env.pc_next())
             }
             Assign(x, y) => {
-                env.pc_advance();
-                env.set(x, env.get(&y))
+                env.set(x, env.get(&y));
+                Some(env.pc_next())
             }
             Deref(x, y) => {
-                env.pc_advance();
-                env.set(x, env.get(&y))
+                env.set(x, env.get(&y));
+                Some(env.pc_next())
             }
             Store(x, y) => {
-                env.pc_advance();
                 let val = env.get(&y);
                 let addr = env.get(&x);
                 addr.store(val);
+                Some(env.pc_next())
             }
             Load(x, y) => {
-                env.pc_advance();
-                env.set(x, env.get(&y).load())
+                env.set(x, env.get(&y).load());
+                Some(env.pc_next())
             }
             Arg(x) => {
-                env.pc_advance();
-                env.push_arg(env.get(&x))
+                env.push_arg(env.get(&x));
+                Some(env.pc_next())
             }
             Param(x) => {
-                env.pc_advance();
                 let value = env.pop_arg();
-                env.set(x, value)
+                env.set(x, value);
+                Some(env.pc_next())
             }
-            Label(_) => env.pc_advance(),
+            Label(_) => Some(env.pc_next()),
             Read(x) => {
-                env.pc_advance();
                 let buf = &mut String::new();
-                io::stdin().read_line(buf).expect("input error");
+                self.fin.read_line(buf).expect("input error");
                 let int: i64 = buf.trim().parse().expect("input error");
-                env.set(x, Value::new_int(int))
+                env.set(x, Value::new_int(int));
+                Some(env.pc_next())
             }
             Write(x) => {
-                env.pc_advance();
                 let value = env.get(&x);
-                println!("{value}")
+                writeln!(self.fout, "{value}").expect("write error");
+                Some(env.pc_next())
             }
             Dec(x, size) => {
-                env.pc_advance();
-                env.set(x, Value::new_ptr(size as usize))
+                env.set(x, Value::new_ptr(size as usize));
+                Some(env.pc_next())
             }
             Call { id, .. } => {
                 env.push_frame(id);
+                Some(env.pc())
             }
             Return(x) => {
                 if env.top_frame().func == program.entry {
-                    return instr_cnt;
+                    return None;
                 }
                 let value = env.get(&x);
                 env.pop_frame();
@@ -82,10 +123,10 @@ pub fn exec(program: &Program) -> usize {
                 match &func.body[env.pc()] {
                     Call { x, .. } => env.set(x.clone(), value),
                     _ => panic!("return error"),
-                }
-                env.pc_advance()
+                };
+                Some(env.pc_next())
             }
-            Goto { id, .. } => env.pc_set(id),
+            Goto { id, .. } => Some(id),
             Cond { x, op, y, id, .. } => {
                 let vx = env.get(&x);
                 let vy = env.get(&y);
@@ -98,9 +139,9 @@ pub fn exec(program: &Program) -> usize {
                     RelOp::NE => vx != vy,
                 };
                 if jmp {
-                    env.pc_set(id);
+                    Some(id)
                 } else {
-                    env.pc_advance();
+                    Some(env.pc_next())
                 }
             }
         }
@@ -113,46 +154,53 @@ mod tests {
 
     use super::*;
 
+    fn config(code: &str, input: &str, output: &str) {
+        let mut parser = Parser::from(code);
+        let program = parser.parse();
+        let mut interpreter = Interpreter::new(program, input.as_bytes(), Vec::new());
+        interpreter.exec();
+
+        assert_eq!(interpreter.fout.into_inner().unwrap(), output.as_bytes());
+    }
+
     #[test]
     fn test_exec() {
-        let mut parser = Parser::from(
+        config(
             "FUNCTION main :
              x := #114 * #514
              y := #0 - x
              WRITE y
              RETURN #0
              ",
+            "",
+            "-58596\n",
         );
-        let mut program = parser.parse();
-        program.init();
-        exec(&program);
     }
 
     #[test]
     fn test_arg() {
-        let mut parser = Parser::from(
+        config(
             "FUNCTION id :
-             PARAM n
-             RETURN n
-
-             FUNCTION main :
-             ARG #114
-             x := CALL id
-             ARG #514
-             y := CALL id
-             WRITE x
-             WRITE y
-             RETURN #0
-             ",
+            PARAM n
+            RETURN n
+            
+            FUNCTION main :
+            ARG #114
+            x := CALL id
+            ARG #514
+            y := CALL id
+            WRITE x
+            WRITE y
+            RETURN #0
+            ",
+            "",
+            "114\n514\n",
         );
-        let mut program = parser.parse();
-        program.init();
-        exec(&program);
     }
 
     #[test]
     fn test_fib() {
-        let mut parser = Parser::from(
+        config(
             " FUNCTION fib :
              PARAM n
              IF n != #0 GOTO br1
@@ -177,15 +225,14 @@ mod tests {
              WRITE s
              RETURN #0
             ",
-        );
-        let mut program = parser.parse();
-        program.init();
-        exec(&program);
+            "10\n",
+            "55\n",
+        )
     }
 
     #[test]
     fn test_arr() {
-        let mut parser = Parser::from(
+        config(
             "FUNCTION display :
              PARAM arr1
              c := *arr1
@@ -205,9 +252,9 @@ mod tests {
              uu  := CALL display
              RETURN #0
             ",
+            "",
+            "114\n\
+            514\n",
         );
-        let mut program = parser.parse();
-        program.init();
-        exec(&program);
     }
 }

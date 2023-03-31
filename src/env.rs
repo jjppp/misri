@@ -52,8 +52,8 @@ impl Env {
         self.stack.last().unwrap()
     }
 
-    pub fn pc_advance(&mut self) {
-        self.top_frame_mut().pc += 1
+    pub fn pc_next(&self) -> usize {
+        self.top_frame().pc + 1
     }
 
     pub fn pc_set(&mut self, pc: usize) {

@@ -7,9 +7,9 @@ mod value;
 
 use clap::{arg, Command};
 use parser::Parser;
-use std::fs;
+use std::{fs, io};
 
-use crate::exec::exec;
+use crate::exec::Interpreter;
 
 fn main() {
     let matches = Command::new("misri")
@@ -26,8 +26,8 @@ fn main() {
 
     let cont = fs::read_to_string(file).expect("file error");
     let mut parser = Parser::from(cont.as_str());
-    let mut program = parser.parse();
-    program.init();
-    let instr_cnt = exec(&program);
+    let program = parser.parse();
+    let mut interpreter = Interpreter::new(program, io::stdin(), io::stdout());
+    let instr_cnt = interpreter.exec();
     eprintln!("instrCnt: {instr_cnt}")
 }
