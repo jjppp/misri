@@ -1,3 +1,5 @@
+use char_stream::CharStream;
+
 #[derive(Debug)]
 pub struct Lexer {
     char_stream: CharStream,
@@ -39,7 +41,7 @@ pub enum Token {
 impl Lexer {
     pub fn from(input: String) -> Lexer {
         let mut lexer = Lexer {
-            char_stream: CharStream::from(input),
+            char_stream: CharStream::from_string(input),
             curr: Token::TokEOF,
         };
         lexer.consume();
@@ -51,80 +53,80 @@ impl Lexer {
         self.curr = match self.char_stream.peek() {
             None => Token::TokEOF,
             Some(' ' | '\t' | '\n' | '\r') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 return self.consume();
             }
             Some('0'..='9') => self.lex_int(),
             Some('a'..='z' | 'A'..='Z' | '_') => self.lex_iden(),
             Some('#') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 Token::TokSharp
             }
             Some('+') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 Token::TokAdd
             }
             Some('-') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 Token::TokSub
             }
             Some('*') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 Token::TokStar
             }
             Some('/') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 Token::TokDiv
             }
             Some('=') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 match self.char_stream.peek() {
                     Some('=') => {
-                        self.char_stream.consume();
+                        self.char_stream.next();
                         Token::TokEQ
                     }
                     ch => panic!("lex error: {:?}", ch),
                 }
             }
             Some('<') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 match self.char_stream.peek() {
                     Some('=') => {
-                        self.char_stream.consume();
+                        self.char_stream.next();
                         Token::TokLE
                     }
                     _ => Token::TokLT,
                 }
             }
             Some('>') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 match self.char_stream.peek() {
                     Some('=') => {
-                        self.char_stream.consume();
+                        self.char_stream.next();
                         Token::TokGE
                     }
                     _ => Token::TokGT,
                 }
             }
             Some(':') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 match self.char_stream.peek() {
                     Some('=') => {
-                        self.char_stream.consume();
+                        self.char_stream.next();
                         Token::TokAssign
                     }
                     _ => Token::TokColon,
                 }
             }
             Some('&') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 Token::TokAmp
             }
             Some('!') => {
-                self.char_stream.consume();
+                self.char_stream.next();
                 match self.char_stream.peek() {
                     Some('=') => {
-                        self.char_stream.consume();
+                        self.char_stream.next();
                         Token::TokNE
                     }
                     ch => panic!("lex error: {:?}", ch),
@@ -147,7 +149,7 @@ impl Lexer {
                 Some('0'..='9') => int = int * 10 + ch.and_then(|x| x.to_digit(10)).unwrap() as i64,
                 None | Some(_) => return Token::TokInt(int),
             }
-            self.char_stream.consume();
+            self.char_stream.next();
         }
     }
 
@@ -158,7 +160,7 @@ impl Lexer {
             match ch {
                 Some(ch) => {
                     if ch.is_ascii_alphanumeric() || ch == '_' {
-                        iden.push(self.char_stream.consume())
+                        iden.push(self.char_stream.next().unwrap())
                     } else {
                         break;
                     }
@@ -180,28 +182,6 @@ impl Lexer {
             "WRITE" => Token::TokWrite,
             _ => Token::TokIden(iden),
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct CharStream {
-    input: String,
-    curr: usize,
-}
-
-impl CharStream {
-    pub fn peek(&self) -> Option<char> {
-        self.input.chars().nth(self.curr)
-    }
-
-    pub fn consume(&mut self) -> char {
-        let ch = self.peek().unwrap();
-        self.curr += 1;
-        ch
-    }
-
-    pub fn from(input: String) -> CharStream {
-        CharStream { input, curr: 0 }
     }
 }
 
