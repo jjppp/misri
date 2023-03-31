@@ -110,7 +110,7 @@ where
                 Some(env.pc_next())
             }
             Call { id, .. } => {
-                env.push_frame(id);
+                env.push_frame(&program.funcs[id]);
                 Some(env.pc())
             }
             Return(x) => {

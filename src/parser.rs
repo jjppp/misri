@@ -45,6 +45,8 @@ impl Parser {
         Func {
             name,
             body: self.body.clone(),
+            nreg: 0,
+            id: 0,
         }
     }
 
@@ -162,7 +164,7 @@ impl Parser {
         let (token, lineno) = self.lexer.consume();
         match token {
             Token::TokSharp => Operand::Imm(self.parse_int()),
-            Token::TokIden(name) => Operand::Reg(name),
+            Token::TokIden(name) => Operand::from(name),
             token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }

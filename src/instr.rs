@@ -7,8 +7,42 @@ use crate::env::Frame;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operand {
-    Reg(String),
+    Reg { name: String, id: usize },
     Imm(i64),
+}
+
+impl Operand {
+    fn init(&mut self, bind: &mut Binding) {
+        if let Self::Reg { name, id } = self {
+            bind.insert(name);
+            *id = bind.get(name).unwrap()
+        }
+    }
+}
+
+struct Binding {
+    map: HashMap<String, usize>,
+    id: usize,
+}
+
+impl Binding {
+    pub fn new() -> Binding {
+        Binding {
+            map: HashMap::new(),
+            id: 0,
+        }
+    }
+
+    pub fn insert(&mut self, name: &String) {
+        if self.map.get(name).is_none() {
+            self.map.insert(name.clone(), self.id);
+            self.id += 1;
+        }
+    }
+
+    pub fn get(&self, name: &String) -> Option<usize> {
+        self.map.get(name).copied()
+    }
 }
 
 impl From<i64> for Operand {
@@ -19,14 +53,32 @@ impl From<i64> for Operand {
 
 impl From<&str> for Operand {
     fn from(name: &str) -> Operand {
-        Operand::Reg(String::from(name))
+        Operand::Reg {
+            name: String::from(name),
+            id: Default::default(),
+        }
+    }
+}
+
+impl From<(&str, usize)> for Operand {
+    fn from(value: (&str, usize)) -> Self {
+        Operand::Reg {
+            name: String::from(value.0),
+            id: value.1,
+        }
+    }
+}
+
+impl From<String> for Operand {
+    fn from(value: String) -> Self {
+        Self::from(value.as_str())
     }
 }
 
 impl Display for Operand {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Reg(name) => write!(f, "{name}"),
+            Self::Reg { name, id } => write!(f, "{name}_{id}"),
             Self::Imm(int) => write!(f, "{int}"),
         }
     }
@@ -113,6 +165,44 @@ impl Instr {
             id: Default::default(),
         }
     }
+
+    fn bind(&mut self, bind: &mut Binding) {
+        match self {
+            Self::Assign(x, y) => {
+                x.init(bind);
+                y.init(bind)
+            }
+            Self::Arith(x, y, _, z) => {
+                x.init(bind);
+                y.init(bind);
+                z.init(bind)
+            }
+            Self::Deref(x, y) => {
+                x.init(bind);
+                y.init(bind)
+            }
+            Self::Store(x, y) => {
+                x.init(bind);
+                y.init(bind)
+            }
+            Self::Load(x, y) => {
+                x.init(bind);
+                y.init(bind)
+            }
+            Self::Cond { x, y, .. } => {
+                x.init(bind);
+                y.init(bind)
+            }
+            Self::Return(x) => x.init(bind),
+            Self::Dec(x, _) => x.init(bind),
+            Self::Arg(x) => x.init(bind),
+            Self::Call { x, .. } => x.init(bind),
+            Self::Param(x) => x.init(bind),
+            Self::Read(x) => x.init(bind),
+            Self::Write(x) => x.init(bind),
+            _ => (),
+        }
+    }
 }
 
 impl Display for Instr {
@@ -141,6 +231,8 @@ impl Display for Instr {
 pub struct Func {
     pub name: String,
     pub body: Vec<Instr>,
+    pub nreg: usize,
+    pub id: usize,
 }
 
 impl Func {
@@ -153,6 +245,7 @@ impl Func {
             }
         });
 
+        let bind = &mut Binding::new();
         for instr in &mut self.body {
             match instr {
                 Instr::Goto { name, .. } => {
@@ -168,6 +261,11 @@ impl Func {
                 _ => (),
             }
         }
+
+        for instr in &mut self.body {
+            instr.bind(bind);
+        }
+        self.nreg = bind.id
     }
 }
 
@@ -221,6 +319,10 @@ impl Program {
 
         self.funcs
             .iter_mut()
+            .for_each(|func| func.id = *map.get(&func.name).unwrap());
+
+        self.funcs
+            .iter_mut()
             .flat_map(|func| func.body.iter_mut())
             .for_each(|instr| {
                 if let Instr::Call { name, id, .. } = instr {
@@ -259,8 +361,8 @@ mod tests {
          RETURN s
          
          FUNCTION main :
-         READ n
-         ARG n
+         READ n2
+         ARG n2
          s := CALL foo
          WRITE s
          RETURN #0",
@@ -271,7 +373,10 @@ mod tests {
         assert_eq!(
             program.funcs[0].body[6],
             Instr::Cond {
-                x: Operand::from("i"),
+                x: Operand::Reg {
+                    name: String::from("i"),
+                    id: 1
+                },
                 op: RelOp::LE,
                 y: Operand::from(100),
                 name: String::from("loop"),
@@ -281,7 +386,10 @@ mod tests {
         assert_eq!(
             program.funcs[1].body[2],
             Instr::Call {
-                x: Operand::from("s"),
+                x: Operand::Reg {
+                    name: String::from("s"),
+                    id: 1
+                },
                 name: String::from("foo"),
                 id: 0
             }

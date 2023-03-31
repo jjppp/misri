@@ -1,32 +1,30 @@
-use std::collections::HashMap;
-
 use crate::{
-    instr::{Operand, Program},
+    instr::{Func, Operand, Program},
     value::Value,
 };
 
 #[derive(Debug, Clone)]
 pub struct Frame {
-    map: HashMap<Operand, Value>,
+    map: Vec<Value>,
     pub func: usize,
     pub pc: usize,
 }
 
 impl Frame {
-    pub fn new(id: usize) -> Frame {
+    pub fn new(func: &Func) -> Frame {
         Frame {
-            map: HashMap::new(),
+            map: vec![Value::default(); func.nreg + 1],
             pc: 0,
-            func: id,
+            func: func.id,
         }
     }
 
-    pub fn get(&self, operand: &Operand) -> Option<&Value> {
-        self.map.get(operand)
+    pub fn get(&self, id: &usize) -> Option<&Value> {
+        self.map.get(*id)
     }
 
-    pub fn set(&mut self, operand: &Operand, value: &Value) {
-        self.map.insert(operand.clone(), value.clone());
+    pub fn set(&mut self, id: &usize, value: &Value) {
+        self.map[*id] = value.clone();
     }
 }
 
@@ -39,7 +37,7 @@ pub struct Env {
 impl Env {
     pub fn new(program: &Program) -> Env {
         Env {
-            stack: vec![Frame::new(program.entry)],
+            stack: vec![Frame::new(&program.funcs[program.entry])],
             args: Vec::new(),
         }
     }
@@ -67,16 +65,18 @@ impl Env {
     pub fn get(&self, operand: &Operand) -> Value {
         match operand {
             Operand::Imm(int) => Value::new_int(*int),
-            Operand::Reg(name) => self
+            Operand::Reg { name, id } => self
                 .top_frame()
-                .get(operand)
+                .get(id)
                 .unwrap_or_else(|| panic!("{name} undefined"))
                 .clone(),
         }
     }
 
     pub fn set(&mut self, operand: Operand, value: Value) {
-        self.top_frame_mut().set(&operand, &value)
+        if let Operand::Reg { id, .. } = operand {
+            self.top_frame_mut().set(&id, &value)
+        }
     }
 
     pub fn push_arg(&mut self, value: Value) {
@@ -87,8 +87,8 @@ impl Env {
         self.args.pop().expect("arg stack empty")
     }
 
-    pub fn push_frame(&mut self, id: usize) {
-        self.stack.push(Frame::new(id))
+    pub fn push_frame(&mut self, func: &Func) {
+        self.stack.push(Frame::new(func))
     }
 
     pub fn pop_frame(&mut self) {
@@ -105,22 +105,32 @@ mod tests {
     #[test]
     fn test_get_set() {
         let mut env = Env::new(&Program {
-            funcs: VecDeque::new(),
+            funcs: VecDeque::from([Func {
+                name: String::from("foo"),
+                body: Vec::new(),
+                nreg: 2,
+                id: 0,
+            }]),
             entry: 0,
         });
 
-        env.set(Operand::from("x"), Value::new_int(114));
-        env.set(Operand::from("x"), Value::new_int(514));
-        env.set(Operand::from("p"), Value::new_ptr(514));
-        assert_eq!(env.get(&Operand::from("x")), Value::new_int(514));
-        assert_eq!(env.get(&Operand::from("p")), Value::new_ptr(514));
+        env.set(Operand::from(("x", 0)), Value::new_int(114));
+        env.set(Operand::from(("x", 0)), Value::new_int(514));
+        env.set(Operand::from(("p", 1)), Value::new_ptr(514));
+        assert_eq!(env.get(&Operand::from(("x", 0))), Value::new_int(514));
+        assert_eq!(env.get(&Operand::from(("p", 1))), Value::new_ptr(514));
 
-        env.push_frame(Default::default());
-        env.set(Operand::from("x"), Value::new_int(1919));
-        assert_eq!(env.get(&Operand::from("x")), Value::new_int(1919));
+        env.push_frame(&Func {
+            name: String::new(),
+            body: Vec::new(),
+            nreg: 2,
+            id: 0,
+        });
+        env.set(Operand::from(("x", 0)), Value::new_int(1919));
+        assert_eq!(env.get(&Operand::from(("x", 0))), Value::new_int(1919));
 
         env.pop_frame();
-        assert_eq!(env.get(&Operand::from("x")), Value::new_int(514));
-        assert_eq!(env.get(&Operand::from("p")), Value::new_ptr(514));
+        assert_eq!(env.get(&Operand::from(("x", 0))), Value::new_int(514));
+        assert_eq!(env.get(&Operand::from(("p", 1))), Value::new_ptr(514));
     }
 }
