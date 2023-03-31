@@ -26,7 +26,9 @@ impl Value {
     pub fn load(&self) -> Value {
         match self {
             Value::ValPtr { mem, size, ptr } => {
-                // TODO: bounds checking
+                if ptr >= size {
+                    panic!("load out of buond");
+                }
                 Value::ValInt(mem.borrow()[*ptr])
             }
             Value::ValInt(_) => panic!("cannot load ValInt"),
@@ -36,7 +38,9 @@ impl Value {
     pub fn store(&self, val: Value) {
         match self {
             Value::ValPtr { mem, size, ptr } => {
-                // TODO: bounds checking
+                if ptr >= size {
+                    panic!("store out of buond");
+                }
                 if let Value::ValInt(int) = val {
                     mem.borrow_mut()[*ptr] = int
                 }
@@ -51,11 +55,11 @@ impl ops::Add<Value> for Value {
 
     fn add(self, rhs: Value) -> Value {
         match (self, rhs) {
-            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs + rhs),
+            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_add(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem: mem.clone(),
                 size,
-                ptr: (ptr as i64 + rhs) as usize,
+                ptr: ((ptr as i64).overflowing_add(rhs).0) as usize,
             },
             _ => panic!("ptr + ptr"),
         }
@@ -67,16 +71,11 @@ impl ops::Sub<Value> for Value {
 
     fn sub(self, rhs: Value) -> Value {
         match (self, rhs) {
-            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs - rhs),
+            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_sub(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem,
                 size,
-                ptr: (ptr as i64 - rhs) as usize,
-            },
-            (Value::ValInt(lhs), Value::ValPtr { mem, size, ptr }) => Value::ValPtr {
-                mem,
-                size,
-                ptr: (ptr as i64 - lhs) as usize,
+                ptr: ((ptr as i64).overflowing_sub(rhs).0) as usize,
             },
             _ => panic!("ptr - ptr"),
         }
@@ -88,11 +87,11 @@ impl ops::Mul<Value> for Value {
 
     fn mul(self, rhs: Value) -> Value {
         match (self, rhs) {
-            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs * rhs),
+            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_mul(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem: mem.clone(),
                 size,
-                ptr: (ptr as i64 * rhs) as usize,
+                ptr: ((ptr as i64).overflowing_mul(rhs).0) as usize,
             },
             _ => panic!("ptr * ptr"),
         }
@@ -104,11 +103,11 @@ impl ops::Div<Value> for Value {
 
     fn div(self, rhs: Value) -> Value {
         match (self, rhs) {
-            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs / rhs),
+            (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_div(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem: mem.clone(),
                 size,
-                ptr: (ptr as i64 / rhs) as usize,
+                ptr: ((ptr as i64).overflowing_div(rhs).0) as usize,
             },
             _ => panic!("ptr / ptr"),
         }
@@ -133,7 +132,7 @@ impl Default for Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ValInt(int) => write!(f, "{int}"),
+            Self::ValInt(int) => write!(f, "{:?}", int.clone() as i32),
             Self::ValPtr { .. } => {
                 let value = self.load();
                 write!(f, "{value}")
@@ -151,6 +150,20 @@ mod tests {
         let v1 = Value::new_int(114);
         let v2 = Value::new_int(514);
         assert_eq!(v1 + v2, Value::new_int(114 + 514))
+    }
+
+    #[test]
+    fn test_overflow() {
+        let v1 = Value::new_int(i64::MAX);
+        let v2 = Value::new_int(1i64);
+        assert_eq!(v1 + v2, Value::new_int(i64::MIN))
+    }
+
+    #[test]
+    fn test_display() {
+        let i = i32::MIN as i64;
+        let v = Value::new_int(i);
+        assert_eq!(format!("{v}"), format!("{i}"));
     }
 
     #[test]
