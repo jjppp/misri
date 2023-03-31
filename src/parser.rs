@@ -156,8 +156,8 @@ impl Parser {
         }
     }
 
-    fn parse_int(&mut self) -> i32 {
-        let mut sign = 1;
+    fn parse_int(&mut self) -> i64 {
+        let mut sign: i64 = 1;
         if self.lexer.peek() == Token::TokSub {
             self.lexer.consume();
             sign = -1

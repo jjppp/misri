@@ -55,7 +55,7 @@ pub fn exec(program: &Program) {
                 env.pc_advance();
                 let buf = &mut String::new();
                 io::stdin().read_line(buf).expect("input error");
-                let int: i32 = buf.trim().parse().expect("input error");
+                let int: i64 = buf.trim().parse().expect("input error");
                 env.set(x, Value::new_int(int))
             }
             IrWrite(x) => {

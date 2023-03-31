@@ -2,16 +2,16 @@ use std::{cell::RefCell, fmt::Display, ops, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
-    ValInt(i32),
+    ValInt(i64),
     ValPtr {
-        mem: Rc<RefCell<Vec<i32>>>,
+        mem: Rc<RefCell<Vec<i64>>>,
         size: usize,
         ptr: usize,
     },
 }
 
 impl Value {
-    pub fn new_int(int: i32) -> Value {
+    pub fn new_int(int: i64) -> Value {
         Value::ValInt(int)
     }
 
@@ -55,7 +55,7 @@ impl ops::Add<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem: mem.clone(),
                 size,
-                ptr: (ptr as i32 + rhs) as usize,
+                ptr: (ptr as i64 + rhs) as usize,
             },
             _ => panic!("ptr + ptr"),
         }
@@ -71,12 +71,12 @@ impl ops::Sub<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem,
                 size,
-                ptr: (ptr as i32 - rhs) as usize,
+                ptr: (ptr as i64 - rhs) as usize,
             },
             (Value::ValInt(lhs), Value::ValPtr { mem, size, ptr }) => Value::ValPtr {
                 mem,
                 size,
-                ptr: (ptr as i32 - lhs) as usize,
+                ptr: (ptr as i64 - lhs) as usize,
             },
             _ => panic!("ptr - ptr"),
         }
@@ -92,7 +92,7 @@ impl ops::Mul<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem: mem.clone(),
                 size,
-                ptr: (ptr as i32 * rhs) as usize,
+                ptr: (ptr as i64 * rhs) as usize,
             },
             _ => panic!("ptr * ptr"),
         }
@@ -108,7 +108,7 @@ impl ops::Div<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem: mem.clone(),
                 size,
-                ptr: (ptr as i32 / rhs) as usize,
+                ptr: (ptr as i64 / rhs) as usize,
             },
             _ => panic!("ptr / ptr"),
         }

@@ -8,11 +8,11 @@ use crate::env::Frame;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operand {
     Reg(String),
-    Imm(i32),
+    Imm(i64),
 }
 
-impl From<i32> for Operand {
-    fn from(int: i32) -> Operand {
+impl From<i64> for Operand {
+    fn from(int: i64) -> Operand {
         Operand::Imm(int)
     }
 }
@@ -94,7 +94,7 @@ pub enum Instr {
         id: usize,
     },
     IrReturn(Operand),
-    IrDec(Operand, i32),
+    IrDec(Operand, i64),
     IrArg(Operand),
     IrCall {
         x: Operand,

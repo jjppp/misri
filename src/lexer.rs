@@ -7,7 +7,7 @@ pub struct Lexer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     TokIden(String),
-    TokInt(i32),
+    TokInt(i64),
     TokFunc,
     TokLabel,
     TokIf,
@@ -140,11 +140,11 @@ impl Lexer {
     }
 
     fn lex_int(&mut self) -> Token {
-        let mut int: i32 = 0;
+        let mut int: i64 = 0;
         loop {
             let ch = self.char_stream.peek();
             match ch {
-                Some('0'..='9') => int = int * 10 + ch.and_then(|x| x.to_digit(10)).unwrap() as i32,
+                Some('0'..='9') => int = int * 10 + ch.and_then(|x| x.to_digit(10)).unwrap() as i64,
                 None | Some(_) => return Token::TokInt(int),
             }
             self.char_stream.consume();
