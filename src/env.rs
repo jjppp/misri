@@ -66,11 +66,11 @@ impl Env {
 
     pub fn get(&self, operand: &Operand) -> Value {
         match operand {
-            Operand::Imm(int) => Value::new_int(int.clone()),
+            Operand::Imm(int) => Value::new_int(*int),
             Operand::Reg(name) => self
                 .top_frame()
                 .get(operand)
-                .expect(format!("{name} undefined").as_str())
+                .unwrap_or_else(|| panic!("{name} undefined"))
                 .clone(),
         }
     }

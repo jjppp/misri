@@ -57,7 +57,7 @@ impl ops::Add<Value> for Value {
         match (self, rhs) {
             (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_add(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
-                mem: mem.clone(),
+                mem,
                 size,
                 ptr: ((ptr as i64).overflowing_add(rhs).0) as usize,
             },
@@ -89,7 +89,7 @@ impl ops::Mul<Value> for Value {
         match (self, rhs) {
             (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_mul(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
-                mem: mem.clone(),
+                mem,
                 size,
                 ptr: ((ptr as i64).overflowing_mul(rhs).0) as usize,
             },
@@ -105,7 +105,7 @@ impl ops::Div<Value> for Value {
         match (self, rhs) {
             (Value::ValInt(lhs), Value::ValInt(rhs)) => Value::ValInt(lhs.overflowing_div(rhs).0),
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
-                mem: mem.clone(),
+                mem,
                 size,
                 ptr: ((ptr as i64).overflowing_div(rhs).0) as usize,
             },
@@ -132,7 +132,7 @@ impl Default for Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ValInt(int) => write!(f, "{:?}", int.clone() as i32),
+            Self::ValInt(int) => write!(f, "{:?}", *int as i32),
             Self::ValPtr { .. } => {
                 let value = self.load();
                 write!(f, "{value}")

@@ -34,81 +34,81 @@ impl Display for Operand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArithOp {
-    OpAdd,
-    OpSub,
-    OpDiv,
-    OpMul,
+    Add,
+    Sub,
+    Div,
+    Mul,
 }
 
 impl Display for ArithOp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::OpAdd => write!(f, "+"),
-            Self::OpSub => write!(f, "-"),
-            Self::OpMul => write!(f, "*"),
-            Self::OpDiv => write!(f, "/"),
+            Self::Add => write!(f, "+"),
+            Self::Sub => write!(f, "-"),
+            Self::Mul => write!(f, "*"),
+            Self::Div => write!(f, "/"),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RelOp {
-    OpLT,
-    OpLE,
-    OpGT,
-    OpGE,
-    OpEQ,
-    OpNE,
+    LT,
+    LE,
+    GT,
+    GE,
+    EQ,
+    NE,
 }
 
 impl Display for RelOp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::OpLT => write!(f, "<"),
-            Self::OpLE => write!(f, "<="),
-            Self::OpGT => write!(f, ">"),
-            Self::OpGE => write!(f, ">="),
-            Self::OpEQ => write!(f, "=="),
-            Self::OpNE => write!(f, "!="),
+            Self::LT => write!(f, "<"),
+            Self::LE => write!(f, "<="),
+            Self::GT => write!(f, ">"),
+            Self::GE => write!(f, ">="),
+            Self::EQ => write!(f, "=="),
+            Self::NE => write!(f, "!="),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instr {
-    IrAssign(Operand, Operand),
-    IrArith(Operand, Operand, ArithOp, Operand),
-    IrDeref(Operand, Operand),
-    IrStore(Operand, Operand),
-    IrLoad(Operand, Operand),
-    IrLabel(String),
-    IrGoto {
+    Assign(Operand, Operand),
+    Arith(Operand, Operand, ArithOp, Operand),
+    Deref(Operand, Operand),
+    Store(Operand, Operand),
+    Load(Operand, Operand),
+    Label(String),
+    Goto {
         name: String,
         id: usize,
     },
-    IrCond {
+    Cond {
         x: Operand,
         op: RelOp,
         y: Operand,
         name: String,
         id: usize,
     },
-    IrReturn(Operand),
-    IrDec(Operand, i64),
-    IrArg(Operand),
-    IrCall {
+    Return(Operand),
+    Dec(Operand, i64),
+    Arg(Operand),
+    Call {
         x: Operand,
         name: String,
         id: usize,
     },
-    IrParam(Operand),
-    IrRead(Operand),
-    IrWrite(Operand),
+    Param(Operand),
+    Read(Operand),
+    Write(Operand),
 }
 
 impl Instr {
     pub fn new_goto(name: &str) -> Instr {
-        Self::IrGoto {
+        Self::Goto {
             name: String::from(name),
             id: Default::default(),
         }
@@ -118,21 +118,21 @@ impl Instr {
 impl Display for Instr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IrAssign(x, y) => write!(f, "{x} := {y}"),
-            Self::IrArith(x, y, op, z) => write!(f, "{x} := {y} {op} {z}"),
-            Self::IrDeref(x, y) => write!(f, "{x} := &{y}"),
-            Self::IrStore(x, y) => write!(f, "*{x} := {y}"),
-            Self::IrLoad(x, y) => write!(f, "{x} := *{y}"),
-            Self::IrLabel(name) => write!(f, "LABEL {name} :"),
-            Self::IrGoto { name, .. } => write!(f, "GOTO {name} "),
-            Self::IrCond { x, op, y, name, .. } => write!(f, "IF {x} {op} {y} GOTO {name}"),
-            Self::IrReturn(x) => write!(f, "RETURN {x}"),
-            Self::IrDec(x, size) => write!(f, "DEC {x} {size}"),
-            Self::IrArg(x) => write!(f, "ARG {x}"),
-            Self::IrCall { x, name, .. } => write!(f, "{x} := CALL {name}"),
-            Self::IrParam(x) => write!(f, "PARAM {x}"),
-            Self::IrRead(x) => write!(f, "READ {x}"),
-            Self::IrWrite(x) => write!(f, "WRITE {x}"),
+            Self::Assign(x, y) => write!(f, "{x} := {y}"),
+            Self::Arith(x, y, op, z) => write!(f, "{x} := {y} {op} {z}"),
+            Self::Deref(x, y) => write!(f, "{x} := &{y}"),
+            Self::Store(x, y) => write!(f, "*{x} := {y}"),
+            Self::Load(x, y) => write!(f, "{x} := *{y}"),
+            Self::Label(name) => write!(f, "LABEL {name} :"),
+            Self::Goto { name, .. } => write!(f, "GOTO {name} "),
+            Self::Cond { x, op, y, name, .. } => write!(f, "IF {x} {op} {y} GOTO {name}"),
+            Self::Return(x) => write!(f, "RETURN {x}"),
+            Self::Dec(x, size) => write!(f, "DEC {x} {size}"),
+            Self::Arg(x) => write!(f, "ARG {x}"),
+            Self::Call { x, name, .. } => write!(f, "{x} := CALL {name}"),
+            Self::Param(x) => write!(f, "PARAM {x}"),
+            Self::Read(x) => write!(f, "READ {x}"),
+            Self::Write(x) => write!(f, "WRITE {x}"),
         }
     }
 }
@@ -148,22 +148,22 @@ impl Func {
         let mut map = HashMap::new();
 
         self.body.iter().enumerate().for_each(|(id, instr)| {
-            if let Instr::IrLabel(name) = instr {
+            if let Instr::Label(name) = instr {
                 map.insert(name.clone(), id);
             }
         });
 
         for instr in &mut self.body {
             match instr {
-                Instr::IrGoto { name, .. } => {
-                    let id = map.get(name).unwrap().clone();
-                    *instr = Instr::IrGoto {
+                Instr::Goto { name, .. } => {
+                    let id = *map.get(name).unwrap();
+                    *instr = Instr::Goto {
                         name: name.clone(),
                         id,
                     }
                 }
-                Instr::IrCond { id, name, .. } => {
-                    *id = map.get(name).expect(format!("{name}").as_str()).clone();
+                Instr::Cond { id, name, .. } => {
+                    *id = *map.get(name).unwrap_or_else(|| panic!("{name}"));
                 }
                 _ => (),
             }
@@ -177,7 +177,7 @@ impl Display for Func {
         writeln!(f, "FUNCTION {name} :")?;
         for instr in &self.body {
             match instr {
-                Instr::IrLabel(_) => writeln!(f, "{instr}")?,
+                Instr::Label(_) => writeln!(f, "{instr}")?,
                 _ => writeln!(f, "  {instr}")?,
             }
         }
@@ -192,10 +192,6 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn push_back(&mut self, func: Func) {
-        self.funcs.push_back(func)
-    }
-
     pub fn push_front(&mut self, func: Func) {
         self.funcs.push_front(func)
     }
@@ -215,23 +211,20 @@ impl Program {
         self.funcs.iter_mut().for_each(|func| func.init());
 
         let mut map: HashMap<String, usize> = HashMap::new();
-        let mut id: usize = 0;
-        for func in &self.funcs {
+        for (id, func) in self.funcs.iter().enumerate() {
             map.insert(func.name.clone(), id);
-            id += 1;
         }
 
-        self.entry = map
+        self.entry = *map
             .get(&String::from("main"))
-            .expect("no main function found")
-            .clone();
+            .expect("no main function found");
 
         self.funcs
             .iter_mut()
             .flat_map(|func| func.body.iter_mut())
             .for_each(|instr| {
-                if let Instr::IrCall { name, id, .. } = instr {
-                    *id = map.get(name).unwrap().clone()
+                if let Instr::Call { name, id, .. } = instr {
+                    *id = *map.get(name).unwrap()
                 }
             });
     }
@@ -277,9 +270,9 @@ mod tests {
         program.init();
         assert_eq!(
             program.funcs[0].body[6],
-            Instr::IrCond {
+            Instr::Cond {
                 x: Operand::from("i"),
-                op: RelOp::OpLE,
+                op: RelOp::LE,
                 y: Operand::from(100),
                 name: String::from("loop"),
                 id: 3
@@ -287,7 +280,7 @@ mod tests {
         );
         assert_eq!(
             program.funcs[1].body[2],
-            Instr::IrCall {
+            Instr::Call {
                 x: Operand::from("s"),
                 name: String::from("foo"),
                 id: 0

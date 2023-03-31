@@ -7,70 +7,70 @@ use crate::{
 };
 
 pub fn exec(program: &Program) {
-    let mut env = Env::new(&program);
+    let mut env = Env::new(program);
     loop {
         let instr = program.fetch(env.top_frame());
         match instr {
-            IrArith(x, y, op, z) => {
+            Arith(x, y, op, z) => {
                 env.pc_advance();
                 let vy = env.get(&y);
                 let vz = env.get(&z);
                 let value = match op {
-                    ArithOp::OpAdd => vy + vz,
-                    ArithOp::OpSub => vy - vz,
-                    ArithOp::OpMul => vy * vz,
-                    ArithOp::OpDiv => vy / vz,
+                    ArithOp::Add => vy + vz,
+                    ArithOp::Sub => vy - vz,
+                    ArithOp::Mul => vy * vz,
+                    ArithOp::Div => vy / vz,
                 };
                 env.set(x, value)
             }
-            IrAssign(x, y) => {
+            Assign(x, y) => {
                 env.pc_advance();
                 env.set(x, env.get(&y))
             }
-            IrDeref(x, y) => {
+            Deref(x, y) => {
                 env.pc_advance();
                 env.set(x, env.get(&y))
             }
-            IrStore(x, y) => {
+            Store(x, y) => {
                 env.pc_advance();
                 let val = env.get(&y);
                 let addr = env.get(&x);
                 addr.store(val);
             }
-            IrLoad(x, y) => {
+            Load(x, y) => {
                 env.pc_advance();
                 env.set(x, env.get(&y).load())
             }
-            IrArg(x) => {
+            Arg(x) => {
                 env.pc_advance();
                 env.push_arg(env.get(&x))
             }
-            IrParam(x) => {
+            Param(x) => {
                 env.pc_advance();
                 let value = env.pop_arg();
                 env.set(x, value)
             }
-            IrLabel(_) => env.pc_advance(),
-            IrRead(x) => {
+            Label(_) => env.pc_advance(),
+            Read(x) => {
                 env.pc_advance();
                 let buf = &mut String::new();
                 io::stdin().read_line(buf).expect("input error");
                 let int: i64 = buf.trim().parse().expect("input error");
                 env.set(x, Value::new_int(int))
             }
-            IrWrite(x) => {
+            Write(x) => {
                 env.pc_advance();
                 let value = env.get(&x);
                 println!("{value}")
             }
-            IrDec(x, size) => {
+            Dec(x, size) => {
                 env.pc_advance();
                 env.set(x, Value::new_ptr(size as usize))
             }
-            IrCall { id, .. } => {
+            Call { id, .. } => {
                 env.push_frame(id);
             }
-            IrReturn(x) => {
+            Return(x) => {
                 if env.top_frame().func == program.entry {
                     return;
                 }
@@ -78,22 +78,22 @@ pub fn exec(program: &Program) {
                 env.pop_frame();
                 let func = &program.funcs[env.top_frame().func];
                 match &func.body[env.pc()] {
-                    IrCall { x, .. } => env.set(x.clone(), value),
+                    Call { x, .. } => env.set(x.clone(), value),
                     _ => panic!("return error"),
                 }
                 env.pc_advance()
             }
-            IrGoto { id, .. } => env.pc_set(id),
-            IrCond { x, op, y, id, .. } => {
+            Goto { id, .. } => env.pc_set(id),
+            Cond { x, op, y, id, .. } => {
                 let vx = env.get(&x);
                 let vy = env.get(&y);
                 let jmp = match op {
-                    RelOp::OpLT => vx < vy,
-                    RelOp::OpLE => vx <= vy,
-                    RelOp::OpGT => vx > vy,
-                    RelOp::OpGE => vx >= vy,
-                    RelOp::OpEQ => vx == vy,
-                    RelOp::OpNE => vx != vy,
+                    RelOp::LT => vx < vy,
+                    RelOp::LE => vx <= vy,
+                    RelOp::GT => vx > vy,
+                    RelOp::GE => vx >= vy,
+                    RelOp::EQ => vx == vy,
+                    RelOp::NE => vx != vy,
                 };
                 if jmp {
                     env.pc_set(id);

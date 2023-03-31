@@ -37,11 +37,10 @@ impl Parser {
         self.lexer.consume();
         self.body = Vec::new();
         self.parse_body();
-        let func = Func {
+        Func {
             name,
             body: self.body.clone(),
-        };
-        func
+        }
     }
 
     fn parse_instr(&mut self) -> Instr {
@@ -50,7 +49,7 @@ impl Parser {
                 self.lexer.consume();
                 let name = self.parse_name();
                 self.lexer.consume();
-                Instr::IrLabel(name)
+                Instr::Label(name)
             }
             Token::TokIden(_) => {
                 let x = self.parse_operand();
@@ -59,17 +58,17 @@ impl Parser {
                     Token::TokAmp => {
                         self.lexer.consume();
                         let y = self.parse_operand();
-                        Instr::IrDeref(x, y)
+                        Instr::Deref(x, y)
                     }
                     Token::TokStar => {
                         self.lexer.consume();
                         let y = self.parse_operand();
-                        Instr::IrLoad(x, y)
+                        Instr::Load(x, y)
                     }
                     Token::TokCall => {
                         self.lexer.consume();
                         let name = self.parse_name();
-                        Instr::IrCall {
+                        Instr::Call {
                             x,
                             name,
                             id: Default::default(),
@@ -81,9 +80,9 @@ impl Parser {
                             Token::TokAdd | Token::TokSub | Token::TokStar | Token::TokDiv => {
                                 let op = self.parse_arith_op();
                                 let z = self.parse_operand();
-                                Instr::IrArith(x, y, op, z)
+                                Instr::Arith(x, y, op, z)
                             }
-                            _ => Instr::IrAssign(x, y),
+                            _ => Instr::Assign(x, y),
                         }
                     }
                     token => panic!("parse error: {:?}", token),
@@ -94,14 +93,11 @@ impl Parser {
                 let lhs = self.parse_operand();
                 self.lexer.consume();
                 let rhs = self.parse_operand();
-                Instr::IrStore(lhs, rhs)
+                Instr::Store(lhs, rhs)
             }
             Token::TokGoto => {
                 self.lexer.consume();
-                Instr::IrGoto {
-                    name: self.parse_name(),
-                    id: Default::default(),
-                }
+                Instr::new_goto(&self.parse_name())
             }
             Token::TokIf => {
                 self.lexer.consume();
@@ -110,7 +106,7 @@ impl Parser {
                 let y = self.parse_operand();
                 self.lexer.consume();
                 let name = self.parse_name();
-                Instr::IrCond {
+                Instr::Cond {
                     x,
                     op,
                     y,
@@ -120,29 +116,29 @@ impl Parser {
             }
             Token::TokReturn => {
                 self.lexer.consume();
-                Instr::IrReturn(self.parse_operand())
+                Instr::Return(self.parse_operand())
             }
             Token::TokDec => {
                 self.lexer.consume();
                 let tar = self.parse_operand();
                 let size = self.parse_int();
-                Instr::IrDec(tar, size)
+                Instr::Dec(tar, size)
             }
             Token::TokArg => {
                 self.lexer.consume();
-                Instr::IrArg(self.parse_operand())
+                Instr::Arg(self.parse_operand())
             }
             Token::TokParam => {
                 self.lexer.consume();
-                Instr::IrParam(self.parse_operand())
+                Instr::Param(self.parse_operand())
             }
             Token::TokRead => {
                 self.lexer.consume();
-                Instr::IrRead(self.parse_operand())
+                Instr::Read(self.parse_operand())
             }
             Token::TokWrite => {
                 self.lexer.consume();
-                Instr::IrWrite(self.parse_operand())
+                Instr::Write(self.parse_operand())
             }
             token => panic!("parse error: {:?}", token),
         }
@@ -170,22 +166,22 @@ impl Parser {
 
     fn parse_rel_op(&mut self) -> RelOp {
         match self.lexer.consume() {
-            Token::TokLT => RelOp::OpLT,
-            Token::TokLE => RelOp::OpLE,
-            Token::TokGT => RelOp::OpGT,
-            Token::TokGE => RelOp::OpGE,
-            Token::TokEQ => RelOp::OpEQ,
-            Token::TokNE => RelOp::OpNE,
+            Token::TokLT => RelOp::LT,
+            Token::TokLE => RelOp::LE,
+            Token::TokGT => RelOp::GT,
+            Token::TokGE => RelOp::GE,
+            Token::TokEQ => RelOp::EQ,
+            Token::TokNE => RelOp::NE,
             token => panic!("parse error: {:?}", token),
         }
     }
 
     fn parse_arith_op(&mut self) -> ArithOp {
         match self.lexer.consume() {
-            Token::TokAdd => ArithOp::OpAdd,
-            Token::TokSub => ArithOp::OpSub,
-            Token::TokStar => ArithOp::OpMul,
-            Token::TokDiv => ArithOp::OpDiv,
+            Token::TokAdd => ArithOp::Add,
+            Token::TokSub => ArithOp::Sub,
+            Token::TokStar => ArithOp::Mul,
+            Token::TokDiv => ArithOp::Div,
             token => panic!("parse error: {:?}", token),
         }
     }
@@ -248,82 +244,82 @@ mod tests {
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrAssign(Operand::from("x"), Operand::from("y"))
+            Instr::Assign(Operand::from("x"), Operand::from("y"))
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrArith(
+            Instr::Arith(
                 Operand::from("x"),
                 Operand::from("y"),
-                ArithOp::OpAdd,
+                ArithOp::Add,
                 Operand::from("z")
             )
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrArith(
+            Instr::Arith(
                 Operand::from("x"),
                 Operand::from("y"),
-                ArithOp::OpSub,
+                ArithOp::Sub,
                 Operand::from("z")
             )
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrArith(
+            Instr::Arith(
                 Operand::from("x"),
                 Operand::from("y"),
-                ArithOp::OpMul,
+                ArithOp::Mul,
                 Operand::from("z")
             )
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrArith(
+            Instr::Arith(
                 Operand::from("x"),
                 Operand::from("y"),
-                ArithOp::OpDiv,
+                ArithOp::Div,
                 Operand::from("z")
             )
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrDeref(Operand::from("x"), Operand::from("y"))
+            Instr::Deref(Operand::from("x"), Operand::from("y"))
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrLoad(Operand::from("x"), Operand::from("y"))
+            Instr::Load(Operand::from("x"), Operand::from("y"))
         );
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrStore(Operand::from("x"), Operand::from("y"))
+            Instr::Store(Operand::from("x"), Operand::from("y"))
         );
         assert_eq!(parser.parse_instr(), Instr::new_goto("wjp"));
-        assert_eq!(parser.parse_instr(), Instr::IrLabel(String::from("wjp")));
+        assert_eq!(parser.parse_instr(), Instr::Label(String::from("wjp")));
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrCond {
+            Instr::Cond {
                 x: Operand::from("x"),
-                op: RelOp::OpLT,
+                op: RelOp::LT,
                 y: Operand::from("y"),
                 name: String::from("wjp"),
                 id: Default::default()
             }
         );
-        assert_eq!(parser.parse_instr(), Instr::IrReturn(Operand::from("x")));
-        assert_eq!(parser.parse_instr(), Instr::IrDec(Operand::from("arr"), 24));
-        assert_eq!(parser.parse_instr(), Instr::IrArg(Operand::from("x")));
+        assert_eq!(parser.parse_instr(), Instr::Return(Operand::from("x")));
+        assert_eq!(parser.parse_instr(), Instr::Dec(Operand::from("arr"), 24));
+        assert_eq!(parser.parse_instr(), Instr::Arg(Operand::from("x")));
         assert_eq!(
             parser.parse_instr(),
-            Instr::IrCall {
+            Instr::Call {
                 x: Operand::from("y"),
                 name: String::from("foo"),
                 id: Default::default()
             }
         );
-        assert_eq!(parser.parse_instr(), Instr::IrParam(Operand::from("x")));
-        assert_eq!(parser.parse_instr(), Instr::IrRead(Operand::from("x")));
-        assert_eq!(parser.parse_instr(), Instr::IrWrite(Operand::from("x")));
+        assert_eq!(parser.parse_instr(), Instr::Param(Operand::from("x")));
+        assert_eq!(parser.parse_instr(), Instr::Read(Operand::from("x")));
+        assert_eq!(parser.parse_instr(), Instr::Write(Operand::from("x")));
     }
 
     #[test]
@@ -348,37 +344,37 @@ mod tests {
         assert_eq!(
             func.body,
             Vec::from([
-                Instr::IrParam(Operand::from("v1")),
-                Instr::IrCond {
+                Instr::Param(Operand::from("v1")),
+                Instr::Cond {
                     x: Operand::from("v1"),
-                    op: RelOp::OpEQ,
+                    op: RelOp::EQ,
                     y: Operand::from(1),
                     name: String::from("label1"),
                     id: Default::default()
                 },
                 Instr::new_goto("label2"),
-                Instr::IrLabel(String::from("label1")),
-                Instr::IrReturn(Operand::from("v1")),
-                Instr::IrLabel(String::from("label2")),
-                Instr::IrArith(
+                Instr::Label(String::from("label1")),
+                Instr::Return(Operand::from("v1")),
+                Instr::Label(String::from("label2")),
+                Instr::Arith(
                     Operand::from("t1"),
                     Operand::from("v1"),
-                    ArithOp::OpSub,
+                    ArithOp::Sub,
                     Operand::from(1)
                 ),
-                Instr::IrArg(Operand::from("t1")),
-                Instr::IrCall {
+                Instr::Arg(Operand::from("t1")),
+                Instr::Call {
                     x: Operand::from("t2"),
                     name: String::from("fact"),
                     id: Default::default()
                 },
-                Instr::IrArith(
+                Instr::Arith(
                     Operand::from("t3"),
                     Operand::from("v1"),
-                    ArithOp::OpMul,
+                    ArithOp::Mul,
                     Operand::from("t2")
                 ),
-                Instr::IrReturn(Operand::from("t3")),
+                Instr::Return(Operand::from("t3")),
             ])
         )
     }
