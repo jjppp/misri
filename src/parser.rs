@@ -18,7 +18,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Program {
-        let token = self.lexer.peek();
+        let (token, lineno) = self.lexer.peek();
         match token {
             Token::TokFunc => {
                 let fun = self.parse_func();
@@ -27,13 +27,18 @@ impl Parser {
                 program
             }
             Token::TokEOF => Program::new(),
-            token => panic!("parse error: {:?}", token),
+            Token::TokNl => {
+                self.lexer.consume();
+                self.parse()
+            }
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 
     fn parse_func(&mut self) -> Func {
         self.lexer.consume();
         let name = self.parse_name();
+        self.lexer.consume();
         self.lexer.consume();
         self.body = Vec::new();
         self.parse_body();
@@ -44,7 +49,8 @@ impl Parser {
     }
 
     fn parse_instr(&mut self) -> Instr {
-        match self.lexer.peek() {
+        let (token, lineno) = self.lexer.peek();
+        let instr = match token {
             Token::TokLabel => {
                 self.lexer.consume();
                 let name = self.parse_name();
@@ -54,7 +60,8 @@ impl Parser {
             Token::TokIden(_) => {
                 let x = self.parse_operand();
                 self.lexer.consume();
-                match self.lexer.peek() {
+                let (token, lineno) = self.lexer.peek();
+                match token {
                     Token::TokAmp => {
                         self.lexer.consume();
                         let y = self.parse_operand();
@@ -76,16 +83,18 @@ impl Parser {
                     }
                     Token::TokIden(_) | Token::TokSharp => {
                         let y = self.parse_operand();
-                        match self.lexer.peek() {
+                        let (token, _) = self.lexer.peek();
+                        match token {
                             Token::TokAdd | Token::TokSub | Token::TokStar | Token::TokDiv => {
                                 let op = self.parse_arith_op();
                                 let z = self.parse_operand();
                                 Instr::Arith(x, y, op, z)
                             }
+                            Token::TokNl => Instr::Assign(x, y),
                             _ => Instr::Assign(x, y),
                         }
                     }
-                    token => panic!("parse error: {:?}", token),
+                    token => panic!("parse error: {:?} at line: {lineno}", token),
                 }
             }
             Token::TokStar => {
@@ -140,62 +149,73 @@ impl Parser {
                 self.lexer.consume();
                 Instr::Write(self.parse_operand())
             }
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
+        };
+        match self.lexer.consume().0 {
+            Token::TokNl | Token::TokEOF => (),
+            _ => panic!("parse error: {:?} at line: {lineno}", token),
         }
+        instr
     }
 
     fn parse_operand(&mut self) -> Operand {
-        match self.lexer.consume() {
+        let (token, lineno) = self.lexer.consume();
+        match token {
             Token::TokSharp => Operand::Imm(self.parse_int()),
             Token::TokIden(name) => Operand::Reg(name),
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 
     fn parse_int(&mut self) -> i64 {
         let mut sign: i64 = 1;
-        if self.lexer.peek() == Token::TokSub {
+        if self.lexer.peek().0 == Token::TokSub {
             self.lexer.consume();
             sign = -1
         }
-        match self.lexer.consume() {
+        let (token, lineno) = self.lexer.consume();
+        match token {
             Token::TokInt(int) => int * sign,
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 
     fn parse_rel_op(&mut self) -> RelOp {
-        match self.lexer.consume() {
+        let (token, lineno) = self.lexer.consume();
+        match token {
             Token::TokLT => RelOp::LT,
             Token::TokLE => RelOp::LE,
             Token::TokGT => RelOp::GT,
             Token::TokGE => RelOp::GE,
             Token::TokEQ => RelOp::EQ,
             Token::TokNE => RelOp::NE,
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 
     fn parse_arith_op(&mut self) -> ArithOp {
-        match self.lexer.consume() {
+        let (token, lineno) = self.lexer.consume();
+        match token {
             Token::TokAdd => ArithOp::Add,
             Token::TokSub => ArithOp::Sub,
             Token::TokStar => ArithOp::Mul,
             Token::TokDiv => ArithOp::Div,
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 
     fn parse_name(&mut self) -> String {
-        match self.lexer.consume() {
+        let (token, lineno) = self.lexer.consume();
+        match token {
             Token::TokIden(name) => name,
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 
     fn parse_body(&mut self) {
-        match self.lexer.peek() {
-            Token::TokFunc | Token::TokEOF => (),
+        let (token, lineno) = self.lexer.peek();
+        match token {
+            Token::TokFunc | Token::TokEOF | Token::TokNl => (),
             Token::TokIf
             | Token::TokLabel
             | Token::TokIden(_)
@@ -211,7 +231,7 @@ impl Parser {
                 self.body.push(instr);
                 self.parse_body()
             }
-            token => panic!("parse error: {:?}", token),
+            token => panic!("parse error: {:?} at line: {lineno}", token),
         }
     }
 }
@@ -404,5 +424,15 @@ mod tests {
         );
         let program = parser.parse();
         assert_eq!(program.funcs.len(), 2);
+    }
+
+    #[test]
+    fn test_nl() {
+        let mut parser = Parser::from(
+            "FUNCTION main :
+             n_i_func_97_i_113 := #0
+             *t_280_at_42_ := n_i_func_97_i_113",
+        );
+        parser.parse();
     }
 }

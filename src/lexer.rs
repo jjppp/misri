@@ -4,6 +4,7 @@ use char_stream::CharStream;
 pub struct Lexer {
     char_stream: CharStream,
     curr: Token,
+    lineno: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +36,7 @@ pub enum Token {
     TokStar,
     TokDiv,
     TokAmp,
+    TokNl,
     TokEOF,
 }
 
@@ -43,16 +45,22 @@ impl Lexer {
         let mut lexer = Lexer {
             char_stream: CharStream::from_string(input),
             curr: Token::TokEOF,
+            lineno: 1,
         };
         lexer.consume();
         lexer
     }
 
-    pub fn consume(&mut self) -> Token {
+    pub fn consume(&mut self) -> (Token, usize) {
         let result = self.peek();
         self.curr = match self.char_stream.peek() {
             None => Token::TokEOF,
-            Some(' ' | '\t' | '\n' | '\r') => {
+            Some('\n') => {
+                self.char_stream.next();
+                self.lineno += 1;
+                Token::TokNl
+            }
+            Some(' ' | '\t' | '\r') => {
                 self.char_stream.next();
                 return self.consume();
             }
@@ -137,8 +145,8 @@ impl Lexer {
         result
     }
 
-    pub fn peek(&mut self) -> Token {
-        self.curr.clone()
+    pub fn peek(&mut self) -> (Token, usize) {
+        (self.curr.clone(), self.lineno)
     }
 
     fn lex_int(&mut self) -> Token {
@@ -192,35 +200,35 @@ mod tests {
     #[test]
     fn test_int() {
         let mut lexer = Lexer::from(String::from("114 514 1919 810"));
-        assert_eq!(lexer.peek(), Token::TokInt(114));
-        assert_eq!(lexer.peek(), Token::TokInt(114));
+        assert_eq!(lexer.peek().0, Token::TokInt(114));
+        assert_eq!(lexer.peek().0, Token::TokInt(114));
 
-        assert_eq!(lexer.consume(), Token::TokInt(114));
-        assert_eq!(lexer.consume(), Token::TokInt(514));
-        assert_eq!(lexer.consume(), Token::TokInt(1919));
-        assert_eq!(lexer.consume(), Token::TokInt(810));
+        assert_eq!(lexer.consume().0, Token::TokInt(114));
+        assert_eq!(lexer.consume().0, Token::TokInt(514));
+        assert_eq!(lexer.consume().0, Token::TokInt(1919));
+        assert_eq!(lexer.consume().0, Token::TokInt(810));
 
-        assert_eq!(lexer.peek(), Token::TokEOF);
-        assert_eq!(lexer.peek(), Token::TokEOF);
-        assert_eq!(lexer.consume(), Token::TokEOF);
-        assert_eq!(lexer.consume(), Token::TokEOF);
+        assert_eq!(lexer.peek().0, Token::TokEOF);
+        assert_eq!(lexer.peek().0, Token::TokEOF);
+        assert_eq!(lexer.consume().0, Token::TokEOF);
+        assert_eq!(lexer.consume().0, Token::TokEOF);
     }
 
     #[test]
     fn test_iden() {
         let mut lexer = Lexer::from(String::from("x y z a_1 __b23"));
-        assert_eq!(lexer.peek(), Token::TokIden(String::from("x")));
-        assert_eq!(lexer.peek(), Token::TokIden(String::from("x")));
+        assert_eq!(lexer.peek().0, Token::TokIden(String::from("x")));
+        assert_eq!(lexer.peek().0, Token::TokIden(String::from("x")));
 
-        assert_eq!(lexer.consume(), Token::TokIden(String::from("x")));
-        assert_eq!(lexer.consume(), Token::TokIden(String::from("y")));
-        assert_eq!(lexer.consume(), Token::TokIden(String::from("z")));
-        assert_eq!(lexer.consume(), Token::TokIden(String::from("a_1")));
-        assert_eq!(lexer.consume(), Token::TokIden(String::from("__b23")));
+        assert_eq!(lexer.consume().0, Token::TokIden(String::from("x")));
+        assert_eq!(lexer.consume().0, Token::TokIden(String::from("y")));
+        assert_eq!(lexer.consume().0, Token::TokIden(String::from("z")));
+        assert_eq!(lexer.consume().0, Token::TokIden(String::from("a_1")));
+        assert_eq!(lexer.consume().0, Token::TokIden(String::from("__b23")));
 
-        assert_eq!(lexer.peek(), Token::TokEOF);
-        assert_eq!(lexer.peek(), Token::TokEOF);
-        assert_eq!(lexer.consume(), Token::TokEOF);
-        assert_eq!(lexer.consume(), Token::TokEOF);
+        assert_eq!(lexer.peek().0, Token::TokEOF);
+        assert_eq!(lexer.peek().0, Token::TokEOF);
+        assert_eq!(lexer.consume().0, Token::TokEOF);
+        assert_eq!(lexer.consume().0, Token::TokEOF);
     }
 }

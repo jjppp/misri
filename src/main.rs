@@ -28,5 +28,6 @@ fn main() {
     let mut parser = Parser::from(cont.as_str());
     let mut program = parser.parse();
     program.init();
-    exec(&program);
+    let instr_cnt = exec(&program);
+    eprintln!("instrCnt: {instr_cnt}")
 }

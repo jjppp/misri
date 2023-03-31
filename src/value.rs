@@ -17,7 +17,7 @@ impl Value {
 
     pub fn new_ptr(size: usize) -> Value {
         Value::ValPtr {
-            mem: Rc::new(RefCell::new(vec![0; size])),
+            mem: Rc::new(RefCell::new(vec![0; size * 2])),
             size,
             ptr: 0,
         }
@@ -59,7 +59,7 @@ impl ops::Add<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem,
                 size,
-                ptr: ((ptr as i64).overflowing_add(rhs).0) as usize,
+                ptr: ((ptr as i64).overflowing_add(rhs / 4).0) as usize,
             },
             _ => panic!("ptr + ptr"),
         }
@@ -75,7 +75,7 @@ impl ops::Sub<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem,
                 size,
-                ptr: ((ptr as i64).overflowing_sub(rhs).0) as usize,
+                ptr: ((ptr as i64).overflowing_sub(rhs / 4).0) as usize,
             },
             _ => panic!("ptr - ptr"),
         }
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn test_ptr() {
         let p1 = Value::new_ptr(4);
-        let offset = Value::new_int(2);
+        let offset = Value::new_int(4);
 
         p1.store(Value::ValInt(114));
         assert_eq!(p1.load(), Value::ValInt(114));

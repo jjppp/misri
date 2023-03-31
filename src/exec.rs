@@ -6,10 +6,12 @@ use crate::{
     value::Value,
 };
 
-pub fn exec(program: &Program) {
+pub fn exec(program: &Program) -> usize {
+    let mut instr_cnt = 0;
     let mut env = Env::new(program);
     loop {
         let instr = program.fetch(env.top_frame());
+        instr_cnt += 1;
         match instr {
             Arith(x, y, op, z) => {
                 env.pc_advance();
@@ -72,7 +74,7 @@ pub fn exec(program: &Program) {
             }
             Return(x) => {
                 if env.top_frame().func == program.entry {
-                    return;
+                    return instr_cnt;
                 }
                 let value = env.get(&x);
                 env.pop_frame();
