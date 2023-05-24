@@ -26,10 +26,11 @@ impl Value {
     pub fn load(&self) -> Value {
         match self {
             Value::ValPtr { mem, size, ptr } => {
-                if ptr >= size {
+                let idx = *ptr / 4;
+                if idx >= *size {
                     panic!("load out of buond");
                 }
-                Value::ValInt(mem.borrow()[*ptr])
+                Value::ValInt(mem.borrow()[idx])
             }
             Value::ValInt(_) => panic!("cannot load ValInt"),
         }
@@ -38,11 +39,12 @@ impl Value {
     pub fn store(&self, val: Value) {
         match self {
             Value::ValPtr { mem, size, ptr } => {
-                if ptr >= size {
+                let idx = *ptr / 4;
+                if idx >= *size {
                     panic!("store out of buond");
                 }
                 if let Value::ValInt(int) = val {
-                    mem.borrow_mut()[*ptr] = int
+                    mem.borrow_mut()[idx] = int
                 }
             }
             Value::ValInt(_) => panic!("cannot store ValInt!"),
@@ -59,7 +61,7 @@ impl ops::Add<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem,
                 size,
-                ptr: ((ptr as i64).overflowing_add(rhs / 4).0) as usize,
+                ptr: ((ptr as i64).overflowing_add(rhs).0) as usize,
             },
             _ => panic!("ptr + ptr"),
         }
@@ -75,7 +77,7 @@ impl ops::Sub<Value> for Value {
             (Value::ValPtr { mem, size, ptr }, Value::ValInt(rhs)) => Value::ValPtr {
                 mem,
                 size,
-                ptr: ((ptr as i64).overflowing_sub(rhs / 4).0) as usize,
+                ptr: ((ptr as i64).overflowing_sub(rhs).0) as usize,
             },
             _ => panic!("ptr - ptr"),
         }
