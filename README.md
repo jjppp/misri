@@ -62,13 +62,13 @@ Note
 
 ### DEC
 
-`<x> := DEC <size>`
+`DEC <x> <size>`
 
 DEC instructions are used to allocate on-stack memories, especially for arrays
 and structs.
 
 The reference manual implies that `<x>` will hold the value of the first 
-four bytes allocated by this instruction. For example, executing `x := DEC 8` 
+four bytes allocated by this instruction. For example, executing `DEC x 8` 
 results in `{{x = 0}}`.
 
 This is a bit of annoying since we expect the allocation to yield a pointer to
@@ -78,7 +78,7 @@ simplifying subsequent procedures to handle memory accesses.
 
 An alternative choice to achieve this could be:
 ```
-tmp := DEC 114  // tmp holds the first 4 bytes of 114 allocated bytes 
+DEC tmp 114  // tmp holds the first 4 bytes of 114 allocated bytes 
 x := &tmp       // x now points to the starting address of the 114 bytes
 ```
 
